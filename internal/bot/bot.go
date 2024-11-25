@@ -1,6 +1,7 @@
 package bot
 
 import (
+	"2links/internal/shortener"
 	"log"
 	"os"
 	"sync"
@@ -12,12 +13,15 @@ import (
 var userStates sync.Map
 
 func StartBot() {
+
 	err := godotenv.Load()
 	if err != nil {
 		log.Panic("Error loading .env file")
 	}
 
 	token := os.Getenv("TELEGRAM_BOT_TOKEN")
+
+	url := os.Getenv("MY_DOMAIN")
 	if token == "" {
 		log.Panic("TELEGRAM_BOT_TOKEN is not set")
 	}
@@ -43,7 +47,7 @@ func StartBot() {
 			log.Printf("[%s] %s", update.Message.From.UserName, update.Message.Text)
 
 			var msg tgbotapi.MessageConfig
-
+			state, ok := userStates.Load(update.Message.Chat.ID)
 			switch update.Message.Text {
 			case "/start":
 				msg = tgbotapi.NewMessage(update.Message.Chat.ID, "Привет! Я бот для сокращения ссылок 2links")
@@ -55,15 +59,24 @@ func StartBot() {
 				msg.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
 				userStates.Store(update.Message.Chat.ID, "awaiting_link")
 			default:
-				state, ok := userStates.Load(update.Message.Chat.ID)
+
 				if ok && state == "awaiting_link" {
-					shortenedLink := generateShortLink(update.Message.Text)
-					msg = tgbotapi.NewMessage(update.Message.Chat.ID, "Вот твоя сокращённая ссылка: "+shortenedLink)
-					msg.ReplyMarkup = keyboard
-					userStates.Delete(update.Message.Chat.ID)
+					longLink := update.Message.Text
+					if shortener.CheckValidacy(longLink) {
+						shortenedLink := url + shortener.СreateShortLink()
+						msg = tgbotapi.NewMessage(update.Message.Chat.ID, "Вот твоя сокращённая ссылка: "+shortenedLink)
+						userStates.Delete(update.Message.Chat.ID)
+					} else {
+						msg = tgbotapi.NewMessage(update.Message.Chat.ID, "Твоя ссылка не валидна, попробуй другую")
+
+					}
+
 				} else {
 					msg = tgbotapi.NewMessage(update.Message.Chat.ID, "Такого не знаю(")
 				}
+			}
+			if state == nil {
+				msg.ReplyMarkup = keyboard
 			}
 
 			if _, err := bot.Send(msg); err != nil {
@@ -71,8 +84,4 @@ func StartBot() {
 			}
 		}
 	}
-}
-
-func generateShortLink(txt string) string {
-	return "xxxx.com/" + txt
 }
