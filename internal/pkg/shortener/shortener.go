@@ -1,35 +1,27 @@
 package shortener
 
 import (
+	"2links/internal/pkg/saving"
 	"math/rand"
-	"net/http"
 	"net/url"
+	"time"
 )
 
 const symbols = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
-func СreateShortLink() string {
+func СreateShortLink(Db *saving.DB, id int64, longlink string) string {
 	var res string
 	for range 4 {
 		res += string(symbols[rand.Intn(len(symbols))])
 	}
+	saving.SaveLink(Db, id, longlink, res, time.Now())
 	return res
 }
 
 func CheckValidacy(link string) bool {
-	addr, err1 := url.Parse(link)
+	_, err1 := url.Parse(link)
 	if err1 != nil {
 		return false
 	}
-	if !addr.IsAbs() {
-		link = "http://" + link
-	}
-
-	resp, err2 := http.Get(link)
-	if err2 != nil {
-		return false
-	}
-	defer resp.Body.Close()
-
-	return resp.StatusCode >= 200 && resp.StatusCode < 400
+	return true
 }

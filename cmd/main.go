@@ -1,7 +1,7 @@
 package main
 
 import (
-	"2links/internal/bot"
+	"2links/internal/pkg/bot"
 )
 
 func main() {
