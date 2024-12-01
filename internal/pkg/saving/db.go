@@ -44,21 +44,31 @@ CREATE TABLE IF NOT EXISTS clicks (
 );
 
 
+CREATE TABLE IF NOT EXISTS reviews (
+    id SERIAL PRIMARY KEY,               
+    user_id INTEGER NOT NULL,   
+	review TEXT NOT NULL,                    
+    FOREIGN KEY (user_id) REFERENCES users(telegram_id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS feedback (
     id SERIAL PRIMARY KEY,               
-    user_id INTEGER NOT NULL,            
-    answers JSONB NOT NULL,              
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    user_id INTEGER NOT NULL,   
+	grade INTEGER NOT NULL,                    
+    FOREIGN KEY (user_id) REFERENCES users(telegram_id) ON DELETE CASCADE
 );`
 
 	queryCheckUser = `SELECT EXISTS (SELECT 1 FROM users WHERE telegram_id = $1)`
-	queryAddUser   = `INSERT INTO users (telegram_id) VALUES ($1);`
+
+	queryAddUser = `INSERT INTO users (telegram_id) VALUES ($1);`
 
 	queryAddLink = `INSERT INTO links (user_id, original_url, short_url, expires_at) VALUES ($1, $2, $3, $4);`
 
 	queryAddClick = `INSERT INTO clicks (link_id, ip_address, user_agent) VALUES ($1, '$2', '$3');`
 
-	queryAddFeedback = `INSERT INTO feedback (user_id, answers) VALUES ($1, $2);`
+	queryAddFeedback = `INSERT INTO feedback (user_id, grade) VALUES ($1, $2);`
+
+	queryAddReview = `INSERT INTO reviews (user_id, review) VALUES ($1, $2);`
 )
 
 type DB struct {
@@ -104,6 +114,24 @@ func AddUser(Database *DB, id int64) error {
 	_, err := Database.Db.Exec(queryAddUser, id)
 	if err != nil {
 		log.Println("Error saving user:", err)
+		return err
+	}
+	return nil
+}
+
+func SaveFeedback(Database *DB, ans int, id int64) error {
+	_, err := Database.Db.Exec(queryAddFeedback, id, ans)
+	if err != nil {
+		log.Println("Error saving feedback:", err)
+		return err
+	}
+	return nil
+}
+
+func SaveReview(Database *DB, ans string, id int64) error {
+	_, err := Database.Db.Exec(queryAddReview, id, ans)
+	if err != nil {
+		log.Println("Error saving review:", err)
 		return err
 	}
 	return nil

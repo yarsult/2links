@@ -51,46 +51,89 @@ func StartBot() {
 	u.Timeout = 60
 
 	keyboard := tgbotapi.NewReplyKeyboard(
-		tgbotapi.NewKeyboardButtonRow(tgbotapi.NewKeyboardButton("Сократить ссылку"), tgbotapi.NewKeyboardButton("Получить помощь")),
+		tgbotapi.NewKeyboardButtonRow(tgbotapi.NewKeyboardButton("Сократить ссылку"), tgbotapi.NewKeyboardButton("Оставить обратную связь")),
+		tgbotapi.NewKeyboardButtonRow(tgbotapi.NewKeyboardButton("Получить помощь")),
 	)
+
+	question := "Как вам наш сервис?"
+	options := []string{"Плохо", "Средне", "Хорошо", "Отлично"}
+	isAnonymous := false
 
 	updates := bot.GetUpdatesChan(u)
 	for update := range updates {
-		if update.Message != nil {
+		if update.PollAnswer != nil {
 			var msg tgbotapi.MessageConfig
-			chat_id := update.Message.Chat.ID
-			state, ok := userStates.Load(chat_id)
+			answer := update.PollAnswer
+			userChoiceIndex := answer.OptionIDs[0]
+			err = saving.SaveFeedback(db, userChoiceIndex+1, answer.User.ID)
+			if userChoiceIndex == 4 {
+				msg = tgbotapi.NewMessage(answer.User.ID, "Спасибо за вашу оценку!")
+			} else {
+				userStates.Store(answer.User.ID, "awaiting_feedback_details")
+				msg = tgbotapi.NewMessage(answer.User.ID, "Расскажите подробнее, что пошло не так?")
+			}
+
+			if _, err := bot.Send(msg); err != nil {
+				log.Printf("Error sending message: %v", err)
+			}
+		} else if update.Message != nil {
+			var msg tgbotapi.MessageConfig
+			chatID := update.Message.Chat.ID
+			state, ok := userStates.Load(chatID)
 			switch update.Message.Text {
 			case "/start":
-				if !saving.UserInBase(db, chat_id) {
-					err = saving.AddUser(db, chat_id)
+				if !saving.UserInBase(db, chatID) {
+					err = saving.AddUser(db, chatID)
 					if err != nil {
-						log.Printf("Не удалось сохранить пользователя")
+						log.Printf("Error saving user %v", err)
 					}
 				}
-				msg = tgbotapi.NewMessage(chat_id, "Привет! Я бот для сокращения ссылок 2links")
+				msg = tgbotapi.NewMessage(chatID, "Привет! Я бот для сокращения ссылок 2links")
 				msg.ReplyMarkup = keyboard
-			case "/help", "Получить помощь":
-				msg = tgbotapi.NewMessage(chat_id, "Я могу помочь с сокращением ссылок:\n/start - Запустить\n/help - Узнать, что я умею")
-			case "Сократить ссылку":
-				msg = tgbotapi.NewMessage(chat_id, "Введи ссылку - и я сокращу её")
-				msg.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
-				userStates.Store(chat_id, "awaiting_link")
-			default:
 
+			case "/help", "Получить помощь":
+				msg = tgbotapi.NewMessage(chatID, "Я могу помочь с сокращением ссылок:\n/start - Запустить\n/feedback - Поделиться мнением о боте\n/help - Узнать, что я умею")
+
+			case "/feedback", "Оставить обратную связь":
+				poll := tgbotapi.SendPollConfig{
+					BaseChat:    tgbotapi.BaseChat{ChatID: chatID},
+					Question:    question,
+					Options:     options,
+					IsAnonymous: isAnonymous,
+				}
+
+				_, err := bot.Send(poll)
+				if err != nil {
+					log.Printf("Failed to send poll: %v", err)
+				}
+
+			case "Сократить ссылку":
+				msg = tgbotapi.NewMessage(chatID, "Введите ссылку - и я сокращу её")
+				msg.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
+				userStates.Store(chatID, "awaiting_link")
+
+			default:
 				if ok && state == "awaiting_link" {
 					longLink := update.Message.Text
 					if shortener.CheckValidacy(longLink) {
-						shortenedLink := url + shortener.СreateShortLink(db, chat_id, longLink)
-						msg = tgbotapi.NewMessage(chat_id, "Вот твоя сокращённая ссылка: "+shortenedLink)
-						userStates.Delete(chat_id)
+						shortenedLink := url + shortener.СreateShortLink(db, chatID, longLink)
+						msg = tgbotapi.NewMessage(chatID, "Вот ваша сокращённая ссылка: "+shortenedLink)
+						userStates.Delete(chatID)
 					} else {
-						msg = tgbotapi.NewMessage(chat_id, "Твоя ссылка не валидна, попробуй другую")
+						msg = tgbotapi.NewMessage(chatID, "Ваша ссылка не действительня, попробуй другую")
 
 					}
 
+				} else if ok && state == "awaiting_feedback_details" {
+					msg = tgbotapi.NewMessage(chatID, "Спасибо за ваш отзыв")
+					err = saving.SaveReview(db, update.Message.Text, chatID)
+					if err != nil {
+						log.Printf("Error saving review: %v", err)
+					}
+					userStates.Delete(chatID)
+
 				} else {
-					msg = tgbotapi.NewMessage(chat_id, "Такого не знаю(")
+					msg = tgbotapi.NewMessage(chatID, "Такого не знаю(")
 				}
 			}
 			if state == nil {
