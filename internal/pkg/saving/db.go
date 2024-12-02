@@ -69,6 +69,8 @@ CREATE TABLE IF NOT EXISTS feedback (
 	queryAddFeedback = `INSERT INTO feedback (user_id, grade) VALUES ($1, $2);`
 
 	queryAddReview = `INSERT INTO reviews (user_id, review) VALUES ($1, $2);`
+
+	queryUniqueLink = `SELECT EXISTS (SELECT 1 FROM links WHERE short_url = $1);`
 )
 
 type DB struct {
@@ -105,6 +107,16 @@ func UserInBase(Database *DB, id int64) bool {
 	err := Database.Db.QueryRow(queryCheckUser, id).Scan(&exists)
 	if err != nil {
 		log.Println("Error finding user:", err)
+		return false
+	}
+	return exists
+}
+
+func LinkInBase(Database *DB, link string) bool {
+	var exists bool
+	err := Database.Db.QueryRow(queryUniqueLink, link).Scan(&exists)
+	if err != nil {
+		log.Println("Error finding link:", err)
 		return false
 	}
 	return exists
