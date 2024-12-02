@@ -3,6 +3,7 @@ package bot
 import (
 	"2links/internal/pkg/saving"
 	"2links/internal/pkg/shortener"
+	"fmt"
 	"log"
 	"os"
 	"sync"
@@ -51,7 +52,9 @@ func StartBot() {
 	u.Timeout = 60
 
 	keyboard := tgbotapi.NewReplyKeyboard(
-		tgbotapi.NewKeyboardButtonRow(tgbotapi.NewKeyboardButton("Сократить ссылку"), tgbotapi.NewKeyboardButton("Оставить обратную связь")),
+		tgbotapi.NewKeyboardButtonRow(tgbotapi.NewKeyboardButton("Сократить ссылку")),
+		tgbotapi.NewKeyboardButtonRow(tgbotapi.NewKeyboardButton("Посмотреть свои ссылки")),
+		tgbotapi.NewKeyboardButtonRow(tgbotapi.NewKeyboardButton("Оставить обратную связь")),
 		tgbotapi.NewKeyboardButtonRow(tgbotapi.NewKeyboardButton("Получить помощь")),
 	)
 
@@ -106,6 +109,19 @@ func StartBot() {
 				if err != nil {
 					log.Printf("Failed to send poll: %v", err)
 				}
+			case "Посмотреть свои ссылки":
+				var links []saving.Link
+				links, err = saving.ShowMyLinks(db, chatID)
+				if err != nil {
+					log.Printf("Error showing links: %v", err)
+				}
+				message := "Вот ваши ссылки:\n"
+				for _, link := range links {
+					formattedTime := link.CreatedAt.Format("02.01.2006, 15:04")
+					message += fmt.Sprintf("%s -> %s : %s\n", url+link.ShortURL, link.OriginalURL, formattedTime)
+				}
+
+				msg = tgbotapi.NewMessage(chatID, message)
 
 			case "Сократить ссылку":
 				msg = tgbotapi.NewMessage(chatID, "Введите ссылку - и я сокращу её")
@@ -125,7 +141,7 @@ func StartBot() {
 					}
 
 				} else if ok && state == "awaiting_feedback_details" {
-					msg = tgbotapi.NewMessage(chatID, "Спасибо за ваш отзыв")
+					msg = tgbotapi.NewMessage(chatID, "Спасибо за ваш отзыв!")
 					err = saving.SaveReview(db, update.Message.Text, chatID)
 					if err != nil {
 						log.Printf("Error saving review: %v", err)

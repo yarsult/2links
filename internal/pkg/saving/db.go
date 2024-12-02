@@ -60,6 +60,13 @@ CREATE TABLE IF NOT EXISTS feedback (
 
 	queryCheckUser = `SELECT EXISTS (SELECT 1 FROM users WHERE telegram_id = $1)`
 
+	queryUniqueLink = `SELECT EXISTS (SELECT 1 FROM links WHERE short_url = $1);`
+
+	queryShowLink = `SELECT short_url, original_url, created_at
+					FROM links
+					WHERE user_id = $1
+					ORDER BY created_at DESC;`
+
 	queryAddUser = `INSERT INTO users (telegram_id) VALUES ($1);`
 
 	queryAddLink = `INSERT INTO links (user_id, original_url, short_url, expires_at) VALUES ($1, $2, $3, $4);`
@@ -69,12 +76,16 @@ CREATE TABLE IF NOT EXISTS feedback (
 	queryAddFeedback = `INSERT INTO feedback (user_id, grade) VALUES ($1, $2);`
 
 	queryAddReview = `INSERT INTO reviews (user_id, review) VALUES ($1, $2);`
-
-	queryUniqueLink = `SELECT EXISTS (SELECT 1 FROM links WHERE short_url = $1);`
 )
 
 type DB struct {
 	Db *sql.DB
+}
+
+type Link struct {
+	ShortURL    string
+	OriginalURL string
+	CreatedAt   time.Time
 }
 
 func CreateDB() (*DB, error) {
@@ -147,6 +158,29 @@ func SaveReview(Database *DB, ans string, id int64) error {
 		return err
 	}
 	return nil
+}
+
+func ShowMyLinks(Database *DB, id int64) ([]Link, error) {
+	rows, err := Database.Db.Query(queryShowLink, id)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to fetch user links: %v", err)
+	}
+	defer rows.Close()
+
+	var links []Link
+	for rows.Next() {
+		var link Link
+		if err := rows.Scan(&link.ShortURL, &link.OriginalURL, &link.CreatedAt); err != nil {
+			return nil, fmt.Errorf("Failed to scan row: %v", err)
+		}
+		links = append(links, link)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("Row iteration error: %v", err)
+	}
+
+	return links, nil
 }
 
 func DropDatabase(dbName string) error {
