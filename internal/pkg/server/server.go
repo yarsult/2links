@@ -39,5 +39,13 @@ func (s *Server) handleRedirect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !startsWithProtocol(originalURL) {
+		originalURL = "http://" + originalURL
+	}
+
 	http.Redirect(w, r, originalURL, http.StatusFound)
+}
+
+func startsWithProtocol(url string) bool {
+	return len(url) >= 7 && (url[:7] == "http://" || len(url) >= 8 && url[:8] == "https://")
 }
