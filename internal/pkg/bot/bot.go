@@ -2,62 +2,21 @@ package bot
 
 import (
 	"2links/internal/pkg/saving"
-	"2links/internal/pkg/server"
 	"2links/internal/pkg/shortener"
 	"fmt"
 	"log"
-	"os"
 	"sync"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	"github.com/joho/godotenv"
 )
 
 var userStates sync.Map
 
-func StartBot() {
-
-	err := godotenv.Load()
-	if err != nil {
-		log.Printf("ENVs were loaded not straightly")
-	}
-
-	token := os.Getenv("TELEGRAM_BOT_TOKEN")
-
-	url := os.Getenv("MY_DOMAIN")
-	if token == "" {
-		log.Panic("TELEGRAM_BOT_TOKEN is not set")
-	}
-
+func StartBot(url string, db *saving.DB, token string) {
 	bot, err := tgbotapi.NewBotAPI(token)
 	if err != nil {
 		log.Panic(err)
 	}
-	err = saving.CreateDatabaseIfNotExists("shortlinks")
-	if err != nil {
-		log.Panic(err)
-	}
-	db, err := saving.CreateDB()
-	if err != nil {
-		log.Panic("Error connecting to database")
-	}
-
-	defer db.Db.Close()
-	// db.Db.Close()
-	// saving.DropDatabase("shortlinks")
-
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
-	domain := os.Getenv("MY_DOMAIN")
-	if domain == "" {
-		domain = "http://localhost:" + port
-	}
-
-	srv := server.NewServer(db.Db, domain)
-	srv.Start(port)
-
 	bot.Debug = true
 	log.Printf("Authorized on account %s", bot.Self.UserName)
 
