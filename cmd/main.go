@@ -4,6 +4,7 @@ import (
 	"2links/internal/pkg/bot"
 	"2links/internal/pkg/saving"
 	"2links/internal/pkg/server"
+	"fmt"
 	"log"
 	"os"
 	"sync"
@@ -19,33 +20,39 @@ func main() {
 	}
 
 	token := os.Getenv("TELEGRAM_BOT_TOKEN")
-
-	url := os.Getenv("MY_DOMAIN")
 	if token == "" {
 		log.Panic("TELEGRAM_BOT_TOKEN is not set")
 	}
+
+	url := os.Getenv("MY_DOMAIN")
 
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
+
 	domain := os.Getenv("MY_DOMAIN")
 	if domain == "" {
 		domain = "http://localhost:" + port
 	}
 
-	err = saving.CreateDatabaseIfNotExists("shortlinks")
+	dbType := os.Getenv("DB")
+	postgresDefault := os.Getenv("POSTGRES_DEFAULT")
+	postgresConn := os.Getenv("POSTGRES")
+	fmt.Println(postgresDefault, postgresConn, dbType)
+	err = saving.CreateDatabaseIfNotExists("shortlinks", dbType, postgresDefault)
 	if err != nil {
 		log.Panic(err)
 	}
-	db, err := saving.CreateDB()
+
+	db, err := saving.CreateDB(dbType, postgresConn)
 	if err != nil {
 		log.Panic("Error connecting to database")
 	}
 
 	defer db.Db.Close()
 	// db.Db.Close()
-	// saving.DropDatabase("shortlinks")
+	// saving.DropDatabase("shortlinks", dbType, postgresDefault)
 
 	var wg sync.WaitGroup
 	wg.Add(2)

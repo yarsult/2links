@@ -83,16 +83,20 @@ func StartBot(url string, db *saving.DB, token string) {
 				}
 			case "Посмотреть свои ссылки":
 				var links []saving.Link
+				var message string
 				links, err = saving.ShowMyLinks(db, chatID)
 				if err != nil {
 					log.Printf("Error showing links: %v", err)
 				}
-				message := "Вот ваши ссылки:\n"
-				for _, link := range links {
-					formattedTime := link.CreatedAt.Format("02.01.2006, 15:04")
-					message += fmt.Sprintf("%s -> %s : %s\n", url+link.ShortURL, link.OriginalURL, formattedTime)
+				if len(links) == 0 {
+					message = "У вас пока нет ссылок"
+				} else {
+					message = "Вот ваши ссылки:\n"
+					for _, link := range links {
+						formattedTime := link.CreatedAt.Format("02.01.2006, 15:04")
+						message += fmt.Sprintf("%s -> %s : %s\n", url+link.ShortURL, link.OriginalURL, formattedTime)
+					}
 				}
-
 				msg = tgbotapi.NewMessage(chatID, message)
 
 			case "Сократить ссылку":
