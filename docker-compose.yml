@@ -19,7 +19,7 @@ services:
     env_file:
       - ./cmd/.env
     ports:
-      - "8080:8080" 
+      - "${PORT:-8090}:${PORT:-8090}"
     depends_on:
       - postgres
 

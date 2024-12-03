@@ -76,6 +76,8 @@ CREATE TABLE IF NOT EXISTS feedback (
 	queryAddFeedback = `INSERT INTO feedback (user_id, grade) VALUES ($1, $2);`
 
 	queryAddReview = `INSERT INTO reviews (user_id, review) VALUES ($1, $2);`
+
+	QuerySelectLink = `SELECT original_url FROM links WHERE short_url = $1`
 )
 
 type DB struct {

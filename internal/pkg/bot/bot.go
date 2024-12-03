@@ -2,6 +2,7 @@ package bot
 
 import (
 	"2links/internal/pkg/saving"
+	"2links/internal/pkg/server"
 	"2links/internal/pkg/shortener"
 	"fmt"
 	"log"
@@ -44,6 +45,18 @@ func StartBot() {
 	defer db.Db.Close()
 	// db.Db.Close()
 	// saving.DropDatabase("shortlinks")
+
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	domain := os.Getenv("MY_DOMAIN")
+	if domain == "" {
+		domain = "http://localhost:" + port
+	}
+
+	srv := server.NewServer(db.Db, domain)
+	srv.Start(port)
 
 	bot.Debug = true
 	log.Printf("Authorized on account %s", bot.Self.UserName)
