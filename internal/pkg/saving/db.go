@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
-	"os"
 	"time"
 
 	_ "github.com/lib/pq"
@@ -78,6 +77,8 @@ CREATE TABLE IF NOT EXISTS feedback (
 	queryAddReview = `INSERT INTO reviews (user_id, review) VALUES ($1, $2);`
 
 	QuerySelectLink = `SELECT original_url FROM links WHERE short_url = $1`
+
+	queryFindDB = `SELECT COUNT(*) = 1 FROM pg_catalog.pg_database WHERE datname = $1`
 )
 
 type DB struct {
@@ -90,19 +91,16 @@ type Link struct {
 	CreatedAt   time.Time
 }
 
-func CreateDB() (*DB, error) {
-	db, err := sql.Open(os.Getenv("DB"), os.Getenv("POSTGRES"))
+func CreateDB(dbtype string, conn string) (*DB, error) {
+	db, err := sql.Open(dbtype, conn)
 	if err != nil {
-		_, err = db.Exec(queryCreateDB)
-		if err == nil {
-			log.Println("Database is being created")
-			db, err = sql.Open(os.Getenv("DB"), os.Getenv("POSTGRES"))
-		} else {
-			log.Fatal("Error connecting to database", err)
-		}
+		log.Fatal("Error connecting to database")
 	}
 
 	_, err = db.Exec(queryCreateTables)
+	if err != nil {
+		log.Fatal("Error creating tables", err)
+	}
 	return &DB{Db: db}, nil
 }
 
@@ -185,9 +183,8 @@ func ShowMyLinks(Database *DB, id int64) ([]Link, error) {
 	return links, nil
 }
 
-func DropDatabase(dbName string) error {
-	connStr := "host=postgres port=5432 user=user password=password dbname=postgres sslmode=disable"
-	db, err := sql.Open("postgres", connStr)
+func DropDatabase(dbName string, dbtype string, postgres string) error {
+	db, err := sql.Open(dbtype, postgres)
 	if err != nil {
 		return fmt.Errorf("Failed to connect to postgres: %v", err)
 	}
@@ -203,20 +200,22 @@ func DropDatabase(dbName string) error {
 	return nil
 }
 
-func CreateDatabaseIfNotExists(dbName string) error {
-	connStr := "host=postgres port=5432 user=user password=password dbname=postgres sslmode=disable"
-	db, err := sql.Open("postgres", connStr)
+func CreateDatabaseIfNotExists(dbName string, dbtype string, postgres string) error {
+	db, err := sql.Open(dbtype, postgres)
+	if err != nil {
+		return fmt.Errorf("Failed to open default database: %v", err)
+	}
+
 	defer db.Close()
 
 	var exists bool
-	query := "SELECT COUNT(*) = 1 FROM pg_catalog.pg_database WHERE datname = $1"
-	err = db.QueryRow(query, dbName).Scan(&exists)
+	err = db.QueryRow(queryFindDB, dbName).Scan(&exists)
 	if err != nil {
 		return fmt.Errorf("Failed to check database existence: %v", err)
 	}
 
 	if !exists {
-		_, err := db.Exec(fmt.Sprintf("CREATE DATABASE %s", dbName))
+		_, err := db.Exec(queryCreateDB)
 		if err != nil {
 			return fmt.Errorf("Failed to create database: %v", err)
 		}
