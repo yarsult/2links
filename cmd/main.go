@@ -4,7 +4,6 @@ import (
 	"2links/internal/pkg/bot"
 	"2links/internal/pkg/saving"
 	"2links/internal/pkg/server"
-	"fmt"
 	"log"
 	"os"
 	"sync"
@@ -39,7 +38,9 @@ func main() {
 	dbType := os.Getenv("DB")
 	postgresDefault := os.Getenv("POSTGRES_DEFAULT")
 	postgresConn := os.Getenv("POSTGRES")
-	fmt.Println(postgresDefault, postgresConn, dbType)
+	if dbType == "" || postgresDefault == "" || postgresConn == "" {
+		log.Panic("Envs weren't loaded")
+	}
 	err = saving.CreateDatabaseIfNotExists("shortlinks", dbType, postgresDefault)
 	if err != nil {
 		log.Panic(err)
@@ -61,7 +62,7 @@ func main() {
 		defer wg.Done()
 		srv := server.NewServer(db.Db, domain)
 		log.Printf("Starting server on port %s", port)
-		srv.Start(port)
+		srv.Start(port, db.Db)
 	}()
 
 	go func() {
