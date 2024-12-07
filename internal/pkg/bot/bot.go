@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"sync"
+	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
@@ -36,7 +37,27 @@ func StartBot(url string, db *saving.DB, token string) {
 
 	updates := bot.GetUpdatesChan(u)
 	for update := range updates {
-		if update.PollAnswer != nil {
+		if update.CallbackQuery != nil {
+			callbackData := update.CallbackQuery.Data
+			chatID := update.CallbackQuery.Message.Chat.ID
+			var message string
+
+			switch {
+			case len(callbackData) > 7 && callbackData[:7] == "delete:":
+				shortLink := callbackData[7:]
+				err := saving.DeleteLink(db.Db, shortLink)
+				if err != nil {
+					log.Printf("Error deleting link: %v", err)
+				}
+				message = "Ссылка удалена"
+			case callbackData == "back":
+				message = "Возвращаемся в основное меню"
+			}
+
+			msg := tgbotapi.NewMessage(chatID, message)
+			msg.ReplyMarkup = keyboard
+			bot.Send(msg)
+		} else if update.PollAnswer != nil {
 			var msg tgbotapi.MessageConfig
 			answer := update.PollAnswer
 			userChoiceIndex := answer.OptionIDs[0]
@@ -84,20 +105,34 @@ func StartBot(url string, db *saving.DB, token string) {
 			case "Посмотреть свои ссылки":
 				var links []saving.Link
 				var message string
+				inlineKeyboard := tgbotapi.NewInlineKeyboardMarkup()
 				links, err = saving.ShowMyLinks(db, chatID)
 				if err != nil {
 					log.Printf("Error showing links: %v", err)
 				}
 				if len(links) == 0 {
 					message = "У вас пока нет ссылок"
+					msg = tgbotapi.NewMessage(chatID, message)
 				} else {
 					message = "Вот ваши ссылки:\n"
 					for _, link := range links {
-						formattedTime := link.CreatedAt.Format("02.01.2006, 15:04")
+						formattedTime := link.CreatedAt.Add(3 * time.Hour).Format("02.01.2006, 15:04")
 						message += fmt.Sprintf("%s -> %s : %s\n", url+link.ShortURL, link.OriginalURL, formattedTime)
+						button := tgbotapi.NewInlineKeyboardButtonData(
+							fmt.Sprintf("Удалить ссылку на %s", link.OriginalURL),
+							fmt.Sprintf("delete:%s", link.ShortURL),
+						)
+						inlineKeyboard.InlineKeyboard = append(inlineKeyboard.InlineKeyboard, tgbotapi.NewInlineKeyboardRow(button))
+						backButton := tgbotapi.NewInlineKeyboardButtonData("Назад", "back")
+						inlineKeyboard.InlineKeyboard = append(inlineKeyboard.InlineKeyboard, tgbotapi.NewInlineKeyboardRow(backButton))
+
+						removeKeyboard := tgbotapi.NewMessage(chatID, "Если хотите удалить ссылку, воспользуйтесь инлайн-кнопками")
+						removeKeyboard.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
+						bot.Send(removeKeyboard)
+						msg = tgbotapi.NewMessage(chatID, message)
+						msg.ReplyMarkup = inlineKeyboard
 					}
 				}
-				msg = tgbotapi.NewMessage(chatID, message)
 
 			case "Сократить ссылку":
 				msg = tgbotapi.NewMessage(chatID, "Введите ссылку - и я сокращу её")
@@ -110,10 +145,10 @@ func StartBot(url string, db *saving.DB, token string) {
 					if shortener.CheckValidacy(longLink) {
 						shortenedLink := url + shortener.СreateShortLink(db, chatID, longLink)
 						msg = tgbotapi.NewMessage(chatID, "Вот ваша сокращённая ссылка: "+shortenedLink)
+						msg.ReplyMarkup = keyboard
 						userStates.Delete(chatID)
 					} else {
 						msg = tgbotapi.NewMessage(chatID, "Ваша ссылка не действительня, попробуй другую")
-
 					}
 
 				} else if ok && state == "awaiting_feedback_details" {
@@ -128,9 +163,9 @@ func StartBot(url string, db *saving.DB, token string) {
 					msg = tgbotapi.NewMessage(chatID, "Такого не знаю(")
 				}
 			}
-			if state == nil {
-				msg.ReplyMarkup = keyboard
-			}
+			// if state == nil {
+			// 	msg.ReplyMarkup = keyboard
+			// }
 
 			if _, err := bot.Send(msg); err != nil {
 				log.Printf("Error sending message: %v", err)

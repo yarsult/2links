@@ -1,39 +1,36 @@
 package server
 
 import (
+	"2links/internal/pkg/saving"
 	"database/sql"
 	"log"
 	"net/http"
 )
 
 type Server struct {
-	DB  *sql.DB
-	URL string
 }
 
 func NewServer(db *sql.DB, url string) *Server {
-	return &Server{
-		DB:  db,
-		URL: url,
-	}
+	return &Server{}
 }
 
-func (s *Server) Start(port string) {
-	http.HandleFunc("/", s.handleRedirect)
+func (s *Server) Start(port string, db *sql.DB) {
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		s.handleRedirect(w, r, db)
+	})
 
 	log.Printf("Server is running on port %s", port)
 	log.Fatal(http.ListenAndServe(":"+port, nil))
 }
 
-func (s *Server) handleRedirect(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleRedirect(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 	shortCode := r.URL.Path[1:]
 	if shortCode == "" {
 		http.NotFound(w, r)
 		return
 	}
 
-	var originalURL string
-	err := s.DB.QueryRow("SELECT original_url FROM links WHERE short_url = $1", shortCode).Scan(&originalURL)
+	originalURL, err := saving.GetOriginalURL(db, shortCode)
 	if err != nil {
 		http.NotFound(w, r)
 		return

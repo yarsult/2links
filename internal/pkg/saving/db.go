@@ -79,6 +79,10 @@ CREATE TABLE IF NOT EXISTS feedback (
 	QuerySelectLink = `SELECT original_url FROM links WHERE short_url = $1`
 
 	queryFindDB = `SELECT COUNT(*) = 1 FROM pg_catalog.pg_database WHERE datname = $1`
+
+	queryGetURL = `SELECT original_url FROM links WHERE short_url = $1`
+
+	queryDeleteLink = `DELETE FROM links WHERE short_url = $1`
 )
 
 type DB struct {
@@ -181,6 +185,32 @@ func ShowMyLinks(Database *DB, id int64) ([]Link, error) {
 	}
 
 	return links, nil
+}
+
+func DeleteLink(db *sql.DB, shortCode string) error {
+	result, err := db.Exec(queryDeleteLink, shortCode)
+	if err != nil {
+		return fmt.Errorf("error deleting link: %w", err)
+	}
+
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		return fmt.Errorf("no link found to delete")
+	}
+
+	return nil
+}
+
+func GetOriginalURL(db *sql.DB, shortLink string) (string, error) {
+	var originalURL string
+
+	err := db.QueryRow(queryGetURL, shortLink).Scan(&originalURL)
+	if err == sql.ErrNoRows {
+		return "", fmt.Errorf("Short link not found")
+	} else if err != nil {
+		return "", fmt.Errorf("Database query error: %w", err)
+	}
+	return originalURL, nil
 }
 
 func DropDatabase(dbName string, dbtype string, postgres string) error {
