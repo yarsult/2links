@@ -123,15 +123,15 @@ func StartBot(url string, db *saving.DB, token string) {
 							fmt.Sprintf("delete:%s", link.ShortURL),
 						)
 						inlineKeyboard.InlineKeyboard = append(inlineKeyboard.InlineKeyboard, tgbotapi.NewInlineKeyboardRow(button))
-						backButton := tgbotapi.NewInlineKeyboardButtonData("Назад", "back")
-						inlineKeyboard.InlineKeyboard = append(inlineKeyboard.InlineKeyboard, tgbotapi.NewInlineKeyboardRow(backButton))
 
-						removeKeyboard := tgbotapi.NewMessage(chatID, "Если хотите удалить ссылку, воспользуйтесь инлайн-кнопками")
-						removeKeyboard.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
-						bot.Send(removeKeyboard)
-						msg = tgbotapi.NewMessage(chatID, message)
-						msg.ReplyMarkup = inlineKeyboard
 					}
+					backButton := tgbotapi.NewInlineKeyboardButtonData("Назад", "back")
+					inlineKeyboard.InlineKeyboard = append(inlineKeyboard.InlineKeyboard, tgbotapi.NewInlineKeyboardRow(backButton))
+					removeKeyboard := tgbotapi.NewMessage(chatID, "Если хотите удалить ссылку, воспользуйтесь инлайн-кнопками")
+					removeKeyboard.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
+					bot.Send(removeKeyboard)
+					msg = tgbotapi.NewMessage(chatID, message)
+					msg.ReplyMarkup = inlineKeyboard
 				}
 
 			case "Сократить ссылку":
