@@ -19,7 +19,7 @@ func СreateShortLink(Db *saving.DB, id int64, longlink string) string {
 		res = saving.LinkInBase(Db, newlink)
 	}
 
-	saving.SaveLink(Db, id, longlink, newlink, time.Now())
+	saving.SaveLink(Db, id, longlink, newlink, time.Now().Add((24 * time.Hour * 30)))
 	return newlink
 }
 

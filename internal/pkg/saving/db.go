@@ -61,7 +61,7 @@ CREATE TABLE IF NOT EXISTS feedback (
 
 	queryUniqueLink = `SELECT EXISTS (SELECT 1 FROM links WHERE short_url = $1);`
 
-	queryShowLink = `SELECT short_url, original_url, created_at
+	queryShowLink = `SELECT short_url, original_url, created_at, expires_at
 					FROM links
 					WHERE user_id = $1
 					ORDER BY created_at DESC;`
@@ -80,9 +80,18 @@ CREATE TABLE IF NOT EXISTS feedback (
 
 	queryFindDB = `SELECT COUNT(*) = 1 FROM pg_catalog.pg_database WHERE datname = $1`
 
-	queryGetURL = `SELECT original_url FROM links WHERE short_url = $1`
+	queryGetURL = `SELECT original_url, id, expires_at FROM links WHERE short_url = $1`
+
+	queryGetClicks = `
+						SELECT l.short_url, l.original_url, COUNT(c.id)
+						FROM links l
+						LEFT JOIN clicks c ON l.id = c.link_id
+						WHERE l.user_id = $1
+						GROUP BY l.short_url, l.original_url`
 
 	queryDeleteLink = `DELETE FROM links WHERE short_url = $1`
+
+	queryUpdateExp = `UPDATE links SET expires_at = $1 WHERE short_url = $2 AND user_id = $3`
 )
 
 type DB struct {
@@ -93,6 +102,7 @@ type Link struct {
 	ShortURL    string
 	OriginalURL string
 	CreatedAt   time.Time
+	ExpiresAt   time.Time
 }
 
 func CreateDB(dbtype string, conn string) (*DB, error) {
@@ -174,7 +184,7 @@ func ShowMyLinks(Database *DB, id int64) ([]Link, error) {
 	var links []Link
 	for rows.Next() {
 		var link Link
-		if err := rows.Scan(&link.ShortURL, &link.OriginalURL, &link.CreatedAt); err != nil {
+		if err := rows.Scan(&link.ShortURL, &link.OriginalURL, &link.CreatedAt, &link.ExpiresAt); err != nil {
 			return nil, fmt.Errorf("Failed to scan row: %v", err)
 		}
 		links = append(links, link)
@@ -190,27 +200,83 @@ func ShowMyLinks(Database *DB, id int64) ([]Link, error) {
 func DeleteLink(db *sql.DB, shortCode string) error {
 	result, err := db.Exec(queryDeleteLink, shortCode)
 	if err != nil {
-		return fmt.Errorf("error deleting link: %w", err)
+		return fmt.Errorf("Error deleting link: %w", err)
 	}
 
 	rowsAffected, _ := result.RowsAffected()
 	if rowsAffected == 0 {
-		return fmt.Errorf("no link found to delete")
+		return fmt.Errorf("No link found to delete")
 	}
 
 	return nil
 }
 
-func GetOriginalURL(db *sql.DB, shortLink string) (string, error) {
-	var originalURL string
-
-	err := db.QueryRow(queryGetURL, shortLink).Scan(&originalURL)
-	if err == sql.ErrNoRows {
-		return "", fmt.Errorf("Short link not found")
-	} else if err != nil {
-		return "", fmt.Errorf("Database query error: %w", err)
+func SaveClick(db *sql.DB, linkID int, ipAddress, userAgent string) error {
+	_, err := db.Exec(queryAddClick, linkID, ipAddress, userAgent)
+	if err != nil {
+		return fmt.Errorf("Failed to save click: %w", err)
 	}
-	return originalURL, nil
+	return nil
+}
+
+func GetClicksByUser(db *sql.DB, userID int64) (map[string]struct {
+	OriginalURL string
+	Clicks      int
+}, error) {
+	rows, err := db.Query(queryGetClicks, userID)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to fetch clicks: %w", err)
+	}
+	defer rows.Close()
+
+	clicks := make(map[string]struct {
+		OriginalURL string
+		Clicks      int
+	})
+	for rows.Next() {
+		var shortURL, originalURL string
+		var count int
+		if err := rows.Scan(&shortURL, &originalURL, &count); err != nil {
+			return nil, fmt.Errorf("Failed to scan row: %w", err)
+		}
+		clicks[shortURL] = struct {
+			OriginalURL string
+			Clicks      int
+		}{
+			OriginalURL: originalURL,
+			Clicks:      count,
+		}
+	}
+
+	return clicks, nil
+}
+
+func GetOriginalURL(db *sql.DB, shortLink string) (string, int, time.Time, error) {
+	var originalURL string
+	var linkID int
+	var expires_at time.Time
+	err := db.QueryRow(queryGetURL, shortLink).Scan(&originalURL, &linkID, &expires_at)
+	if err == sql.ErrNoRows {
+		return "", 0, expires_at, fmt.Errorf("Short link not found")
+	} else if err != nil {
+		return "", 0, expires_at, fmt.Errorf("Database query error: %w", err)
+	}
+	return originalURL, linkID, expires_at, nil
+}
+
+func UpdateLinkExpiry(Database *DB, userID int64, shortURL string, newExpiry time.Time) error {
+
+	result, err := Database.Db.Exec(queryUpdateExp, newExpiry, shortURL, userID)
+	if err != nil {
+		return fmt.Errorf("Error updating link expiry: %w", err)
+	}
+
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		return fmt.Errorf("No link found or not authorized")
+	}
+
+	return nil
 }
 
 func DropDatabase(dbName string, dbtype string, postgres string) error {
