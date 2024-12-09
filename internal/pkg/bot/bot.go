@@ -5,6 +5,7 @@ import (
 	"2links/internal/pkg/shortener"
 	"fmt"
 	"log"
+	"strings"
 	"sync"
 	"time"
 
@@ -52,6 +53,12 @@ func StartBot(url string, db *saving.DB, token string) {
 				message = "Ссылка удалена"
 			case callbackData == "back":
 				message = "Возвращаемся в основное меню"
+
+			case len(callbackData) > 7 && callbackData[:7] == "update:":
+				shortURL := callbackData[7:]
+				userStates.Store(chatID, fmt.Sprintf("awaiting_expiry_%s", shortURL))
+				message = fmt.Sprintf("Введите новый срок хранения для ссылки %s в формате DD-MM-YYYYY:", shortURL)
+
 			}
 
 			msg := tgbotapi.NewMessage(chatID, message)
@@ -66,7 +73,7 @@ func StartBot(url string, db *saving.DB, token string) {
 				msg = tgbotapi.NewMessage(answer.User.ID, "Спасибо за вашу оценку!")
 			} else {
 				userStates.Store(answer.User.ID, "awaiting_feedback_details")
-				msg = tgbotapi.NewMessage(answer.User.ID, "Расскажите подробнее, что пошло не так?")
+				msg = tgbotapi.NewMessage(answer.User.ID, "Расскажите подробнее, что можно улучшить?")
 			}
 
 			if _, err := bot.Send(msg); err != nil {
@@ -102,37 +109,71 @@ func StartBot(url string, db *saving.DB, token string) {
 				if err != nil {
 					log.Printf("Failed to send poll: %v", err)
 				}
-			case "Посмотреть свои ссылки":
-				var links []saving.Link
-				var message string
-				inlineKeyboard := tgbotapi.NewInlineKeyboardMarkup()
-				links, err = saving.ShowMyLinks(db, chatID)
-				if err != nil {
-					log.Printf("Error showing links: %v", err)
-				}
-				if len(links) == 0 {
-					message = "У вас пока нет ссылок"
-					msg = tgbotapi.NewMessage(chatID, message)
-				} else {
-					message = "Вот ваши ссылки:\n"
-					for _, link := range links {
-						formattedTime := link.CreatedAt.Add(3 * time.Hour).Format("02.01.2006, 15:04")
-						message += fmt.Sprintf("%s -> %s : %s\n", url+link.ShortURL, link.OriginalURL, formattedTime)
-						button := tgbotapi.NewInlineKeyboardButtonData(
-							fmt.Sprintf("Удалить ссылку на %s", link.OriginalURL),
-							fmt.Sprintf("delete:%s", link.ShortURL),
-						)
-						inlineKeyboard.InlineKeyboard = append(inlineKeyboard.InlineKeyboard, tgbotapi.NewInlineKeyboardRow(button))
 
-					}
-					backButton := tgbotapi.NewInlineKeyboardButtonData("Назад", "back")
-					inlineKeyboard.InlineKeyboard = append(inlineKeyboard.InlineKeyboard, tgbotapi.NewInlineKeyboardRow(backButton))
-					removeKeyboard := tgbotapi.NewMessage(chatID, "Если хотите удалить ссылку, воспользуйтесь инлайн-кнопками")
-					removeKeyboard.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
-					bot.Send(removeKeyboard)
-					msg = tgbotapi.NewMessage(chatID, message)
-					msg.ReplyMarkup = inlineKeyboard
+			case "Посмотреть свои ссылки":
+				stats, err := saving.GetClicksByUser(db.Db, chatID)
+				if err != nil {
+					log.Printf("Error fetching clicks: %v", err)
+					bot.Send(tgbotapi.NewMessage(chatID, "Ошибка при получении статистики. Попробуйте позже."))
+					return
 				}
+
+				links, err := saving.ShowMyLinks(db, chatID)
+				if err != nil {
+					log.Printf("Error fetching links: %v", err)
+					bot.Send(tgbotapi.NewMessage(chatID, "Ошибка при получении ваших ссылок. Попробуйте позже."))
+					return
+				}
+
+				if len(links) == 0 {
+					bot.Send(tgbotapi.NewMessage(chatID, "У вас пока нет ссылок."))
+					return
+				}
+
+				message := "Ваши ссылки:\n"
+				inlineKeyboard := tgbotapi.NewInlineKeyboardMarkup()
+
+				for _, link := range links {
+					statsData, ok := stats[link.ShortURL]
+					clicks := 0
+					if ok {
+						clicks = statsData.Clicks
+					}
+
+					formattedTime := link.CreatedAt.Add(3 * time.Hour).Format("02.01.2006, 15:04")
+					expiryTime := link.ExpiresAt.Format("02.01.2006, 15:04")
+					daysLeft := int(time.Until(link.ExpiresAt).Hours() / 24)
+					if daysLeft < 0 {
+						message += fmt.Sprintf(
+							"Ссылка: %s\nОригинал: %s\nПереходов: %d\nСоздана: %s\nСтатус: Просрочена\n\n",
+							url+link.ShortURL, link.OriginalURL, clicks, formattedTime,
+						)
+					} else {
+						message += fmt.Sprintf(
+							"Ссылка: %s\nОригинал: %s\nПереходов: %d\nСоздана: %s\nИстекает: %s\nОсталось: %d дней\n\n",
+							url+link.ShortURL, link.OriginalURL, clicks, formattedTime, expiryTime, daysLeft,
+						)
+					}
+
+					deleteButton := tgbotapi.NewInlineKeyboardButtonData(
+						fmt.Sprintf("Удалить %s", link.ShortURL),
+						fmt.Sprintf("delete:%s", link.ShortURL),
+					)
+
+					updateButton := tgbotapi.NewInlineKeyboardButtonData(
+						fmt.Sprintf("Изменить срок %s", link.ShortURL),
+						fmt.Sprintf("update:%s", link.ShortURL),
+					)
+
+					inlineKeyboard.InlineKeyboard = append(
+						inlineKeyboard.InlineKeyboard,
+						tgbotapi.NewInlineKeyboardRow(deleteButton, updateButton),
+					)
+				}
+
+				msg := tgbotapi.NewMessage(chatID, message)
+				msg.ReplyMarkup = inlineKeyboard
+				bot.Send(msg)
 
 			case "Сократить ссылку":
 				msg = tgbotapi.NewMessage(chatID, "Введите ссылку - и я сокращу её")
@@ -159,6 +200,25 @@ func StartBot(url string, db *saving.DB, token string) {
 					}
 					userStates.Delete(chatID)
 
+				} else if ok && strings.HasPrefix(state.(string), "awaiting_expiry_") {
+					shortURL := strings.TrimPrefix(state.(string), "awaiting_expiry_")
+					newExpiry, err := time.Parse("02-01-2006", update.Message.Text)
+					var message string
+					if err != nil {
+						msg := tgbotapi.NewMessage(chatID, "Неверный формат даты. Используйте формат: DD-MM-YYYY.")
+						bot.Send(msg)
+						break
+					}
+
+					err = saving.UpdateLinkExpiry(db, chatID, shortURL, newExpiry)
+					if err != nil {
+						message = "Не удалось обновить срок хранения. Убедитесь, что ссылка существует."
+					} else {
+						message = "Срок хранения успешно обновлён."
+					}
+
+					userStates.Delete(chatID)
+					bot.Send(tgbotapi.NewMessage(chatID, message))
 				} else {
 					msg = tgbotapi.NewMessage(chatID, "Такого не знаю(")
 				}

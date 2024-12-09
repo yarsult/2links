@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"log"
 	"net/http"
+	"strings"
+	"time"
 )
 
 type Server struct {
@@ -30,10 +32,24 @@ func (s *Server) handleRedirect(w http.ResponseWriter, r *http.Request, db *sql.
 		return
 	}
 
-	originalURL, err := saving.GetOriginalURL(db, shortCode)
+	originalURL, linkID, exp, err := saving.GetOriginalURL(db, shortCode)
 	if err != nil {
 		http.NotFound(w, r)
 		return
+	}
+
+	if time.Now().After(exp) {
+		http.NotFound(w, r)
+		return
+	}
+	ipAddress := r.RemoteAddr
+	if colonIndex := strings.LastIndex(ipAddress, ":"); colonIndex != -1 {
+		ipAddress = ipAddress[:colonIndex]
+	}
+	userAgent := r.Header.Get("User-Agent")
+	err = saving.SaveClick(db, linkID, ipAddress, userAgent)
+	if err != nil {
+		log.Printf("Failed to save click: %v", err)
 	}
 
 	if !startsWithProtocol(originalURL) {
