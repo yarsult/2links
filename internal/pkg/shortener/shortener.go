@@ -10,12 +10,17 @@ import (
 const symbols = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
 func СreateShortLink(Db *saving.DB, id int64, longlink string) string {
-	var res string
-	for range 4 {
-		res += string(symbols[rand.Intn(len(symbols))])
+	var newlink string
+	res := true
+	for res != false {
+		for range 4 {
+			newlink += string(symbols[rand.Intn(len(symbols))])
+		}
+		res = saving.LinkInBase(Db, newlink)
 	}
-	saving.SaveLink(Db, id, longlink, res, time.Now())
-	return res
+
+	saving.SaveLink(Db, id, longlink, newlink, time.Now().Add((24 * time.Hour * 30)))
+	return newlink
 }
 
 func CheckValidacy(link string) bool {
@@ -23,5 +28,6 @@ func CheckValidacy(link string) bool {
 	if err1 != nil {
 		return false
 	}
+
 	return true
 }
