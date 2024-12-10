@@ -27,7 +27,8 @@ func StartBot(url string, db *saving.DB, token string) {
 
 	keyboard := tgbotapi.NewReplyKeyboard(
 		tgbotapi.NewKeyboardButtonRow(tgbotapi.NewKeyboardButton("Сократить ссылку")),
-		tgbotapi.NewKeyboardButtonRow(tgbotapi.NewKeyboardButton("Посмотреть свои ссылки")),
+		tgbotapi.NewKeyboardButtonRow(tgbotapi.NewKeyboardButton("Мои ссылки")),
+		tgbotapi.NewKeyboardButtonRow(tgbotapi.NewKeyboardButton("Пожаловаться на ссылку")),
 		tgbotapi.NewKeyboardButtonRow(tgbotapi.NewKeyboardButton("Оставить обратную связь")),
 		tgbotapi.NewKeyboardButtonRow(tgbotapi.NewKeyboardButton("Получить помощь")),
 	)
@@ -110,7 +111,7 @@ func StartBot(url string, db *saving.DB, token string) {
 					log.Printf("Failed to send poll: %v", err)
 				}
 
-			case "Посмотреть свои ссылки":
+			case "Мои ссылки":
 				stats, err := saving.GetClicksByUser(db.Db, chatID)
 				if err != nil {
 					log.Printf("Error fetching clicks: %v", err)
@@ -180,6 +181,11 @@ func StartBot(url string, db *saving.DB, token string) {
 				msg.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
 				userStates.Store(chatID, "awaiting_link")
 
+			case "Пожаловаться на ссылку":
+				msg = tgbotapi.NewMessage(chatID, "Введите ссылку, на которую хотите пожаловаться в формате 2lnx.ru/xxxx")
+				msg.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
+				userStates.Store(chatID, "awaiting_bad_link")
+
 			default:
 				if ok && state == "awaiting_link" {
 					longLink := update.Message.Text
@@ -198,6 +204,28 @@ func StartBot(url string, db *saving.DB, token string) {
 					if err != nil {
 						log.Printf("Error saving review: %v", err)
 					}
+					userStates.Delete(chatID)
+
+				} else if ok && state == "awaiting_bad_link" {
+					var linkID int
+					var message string
+					if strings.HasPrefix(update.Message.Text, "2lnx.ru/") {
+						badLink := update.Message.Text[8:]
+						linkID, err = saving.FindLink(db.Db, badLink)
+						if err != nil {
+							log.Printf("Error finding link: %v", err)
+						} else if linkID == 0 {
+							message = "Ссылка не найдена"
+						} else {
+							err = saving.SuspectLink(db.Db, linkID, badLink)
+							message = "Спасибо за обращения, мы проверим эту ссылку"
+						}
+					} else {
+						message = "Неверный формат ссылки"
+					}
+
+					msg = tgbotapi.NewMessage(chatID, message)
+					msg.ReplyMarkup = keyboard
 					userStates.Delete(chatID)
 
 				} else if ok && strings.HasPrefix(state.(string), "awaiting_expiry_") {
