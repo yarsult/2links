@@ -42,6 +42,12 @@ CREATE TABLE IF NOT EXISTS clicks (
     FOREIGN KEY (link_id) REFERENCES links(id) ON DELETE CASCADE 
 );
 
+CREATE TABLE IF NOT EXISTS suspect_links (
+    id SERIAL PRIMARY KEY,                         
+    short_url VARCHAR(255) UNIQUE NOT NULL, 
+	FOREIGN KEY (id) REFERENCES links(id) ON DELETE CASCADE
+);
+
 
 CREATE TABLE IF NOT EXISTS reviews (
     id SERIAL PRIMARY KEY,               
@@ -72,11 +78,13 @@ CREATE TABLE IF NOT EXISTS feedback (
 
 	queryAddClick = `INSERT INTO clicks (link_id, ip_address, user_agent) VALUES ($1, $2, $3);`
 
+	queryAddSuspect = `INSERT INTO suspect_links (id, short_url) VALUES ($1, $2);`
+
 	queryAddFeedback = `INSERT INTO feedback (user_id, grade) VALUES ($1, $2);`
 
 	queryAddReview = `INSERT INTO reviews (user_id, review) VALUES ($1, $2);`
 
-	QuerySelectLink = `SELECT original_url FROM links WHERE short_url = $1`
+	querySelectLink = `SELECT id FROM links WHERE short_url = $1`
 
 	queryFindDB = `SELECT COUNT(*) = 1 FROM pg_catalog.pg_database WHERE datname = $1`
 
@@ -167,6 +175,26 @@ func SaveFeedback(Database *DB, ans int, id int64) error {
 
 func SaveReview(Database *DB, ans string, id int64) error {
 	_, err := Database.Db.Exec(queryAddReview, id, ans)
+	if err != nil {
+		log.Println("Error saving review:", err)
+		return err
+	}
+	return nil
+}
+
+func FindLink(db *sql.DB, link string) (int, error) {
+	var linkID int
+	err := db.QueryRow(querySelectLink, link).Scan(&linkID)
+	if err == sql.ErrNoRows {
+		return 0, nil
+	} else if err != nil {
+		return 0, fmt.Errorf("Database query error: %w", err)
+	}
+	return linkID, nil
+}
+
+func SuspectLink(db *sql.DB, id int, link string) error {
+	_, err := db.Exec(queryAddSuspect, id, link)
 	if err != nil {
 		log.Println("Error saving review:", err)
 		return err
