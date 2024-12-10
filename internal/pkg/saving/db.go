@@ -70,7 +70,7 @@ CREATE TABLE IF NOT EXISTS feedback (
 
 	queryAddLink = `INSERT INTO links (user_id, original_url, short_url, expires_at) VALUES ($1, $2, $3, $4);`
 
-	queryAddClick = `INSERT INTO clicks (link_id, ip_address, user_agent) VALUES ($1, '$2', '$3');`
+	queryAddClick = `INSERT INTO clicks (link_id, ip_address, user_agent) VALUES ($1, $2, $3);`
 
 	queryAddFeedback = `INSERT INTO feedback (user_id, grade) VALUES ($1, $2);`
 
