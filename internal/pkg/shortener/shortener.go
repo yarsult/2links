@@ -2,10 +2,15 @@ package shortener
 
 import (
 	"2links/internal/pkg/saving"
+	"fmt"
 	"math/rand"
 	"net/url"
+	"os"
+	"path/filepath"
 	"regexp"
 	"time"
+
+	"github.com/skip2/go-qrcode"
 )
 
 const symbols = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
@@ -36,4 +41,21 @@ func CheckValidacy(link string) bool {
 	}
 
 	return false
+}
+
+func GenerateQRCode(url string, short string) (string, error) {
+	fileName := fmt.Sprintf("qr_%s.png", filepath.Base(short))
+	filePath := filepath.Join(os.TempDir(), fileName)
+	fmt.Println(filePath)
+	err := qrcode.WriteFile(url+short, qrcode.Medium, 256, filePath)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate QR code: %w", err)
+	}
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		fmt.Printf("Error reading file: %v\n", err)
+	} else {
+		fmt.Printf("File content size: %d bytes\n", len(content))
+	}
+	return filePath, nil
 }
