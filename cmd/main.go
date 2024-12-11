@@ -23,6 +23,11 @@ func main() {
 		log.Panic("TELEGRAM_BOT_TOKEN is not set")
 	}
 
+	admToken := os.Getenv("ADMIN_BOT_TOKEN")
+	if admToken == "" {
+		log.Panic("ADMIN_BOT_TOKEN is not set")
+	}
+
 	url := os.Getenv("MY_DOMAIN")
 
 	port := os.Getenv("PORT")
@@ -56,7 +61,7 @@ func main() {
 	// saving.DropDatabase("shortlinks", dbType, postgresDefault)
 
 	var wg sync.WaitGroup
-	wg.Add(2)
+	wg.Add(3)
 
 	go func() {
 		defer wg.Done()
@@ -69,6 +74,12 @@ func main() {
 		defer wg.Done()
 		log.Println("Starting Telegram bot")
 		bot.StartBot(url, db, token)
+	}()
+
+	go func() {
+		defer wg.Done()
+		log.Println("Starting Admin bot")
+		bot.StartAdminBot(admToken, db)
 	}()
 
 	wg.Wait()

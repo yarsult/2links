@@ -87,7 +87,9 @@ func StartBot(url string, db *saving.DB, token string) {
 			chatID := update.Message.Chat.ID
 			state, ok := userStates.Load(chatID)
 			switch update.Message.Text {
+
 			case "/start":
+
 				if !saving.UserInBase(db, chatID) {
 					err = saving.AddUser(db, chatID)
 					if err != nil {
@@ -152,10 +154,12 @@ func StartBot(url string, db *saving.DB, token string) {
 							url+link.ShortURL, link.OriginalURL, clicks, formattedTime,
 						)
 					} else {
+
 						message += fmt.Sprintf(
-							"Ссылка: %s\nОригинал: %s\nПереходов: %d\nСоздана: %s\nИстекает: %s\nОсталось: %d дней\n\n",
-							url+link.ShortURL, link.OriginalURL, clicks, formattedTime, expiryTime, daysLeft,
+							"Ссылка: [%s](%s)\nОригинал: %s\nПереходов: %d\nСоздана: %s\nИстекает: %s\nОсталось: %d дней\nQR-код: [/qr_%s](%s)\n\n",
+							url+link.ShortURL, url+link.ShortURL, link.OriginalURL, clicks, formattedTime, expiryTime, daysLeft, link.ShortURL, fmt.Sprintf("/qr/%s", link.ShortURL),
 						)
+
 					}
 
 					deleteButton := tgbotapi.NewInlineKeyboardButtonData(
@@ -176,6 +180,7 @@ func StartBot(url string, db *saving.DB, token string) {
 
 				msg := tgbotapi.NewMessage(chatID, message)
 				msg.ReplyMarkup = inlineKeyboard
+				msg.ParseMode = "Markdown"
 				bot.Send(msg)
 
 			case "Сократить ссылку":
@@ -250,6 +255,21 @@ func StartBot(url string, db *saving.DB, token string) {
 
 					userStates.Delete(chatID)
 					bot.Send(tgbotapi.NewMessage(chatID, message))
+				} else if strings.HasPrefix(update.Message.Text, "/qr_") {
+					shortURL := strings.TrimPrefix(update.Message.Text, "/qr_")
+					qrFilePath, err := shortener.GenerateQRCode(url, shortURL)
+					if err != nil {
+						msg = tgbotapi.NewMessage(chatID, "Ошибка при генерации QR-кода. Убедитесь, что ссылка существует.")
+						bot.Send(msg)
+						log.Printf("Error generating QR code: %v", err)
+						break
+					}
+
+					photo := tgbotapi.NewPhoto(chatID, tgbotapi.FilePath(qrFilePath))
+					photo.Caption = fmt.Sprintf("QR-код для ссылки: %s%s", url, shortURL)
+					bot.Send(photo)
+					break
+
 				} else {
 					msg = tgbotapi.NewMessage(chatID, "Такого не знаю(")
 				}

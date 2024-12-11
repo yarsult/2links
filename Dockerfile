@@ -16,6 +16,8 @@ COPY --from=builder /app/bot .
 
 COPY cmd/.env .env
 
+COPY internal/pkg/bot/adminPasswordHash.txt /app/internal/pkg/bot/adminPasswordHash.txt
+
 ENV ENV_PATH=/app/.env
 
 ENTRYPOINT ["/app/bot"]

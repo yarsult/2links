@@ -100,6 +100,18 @@ CREATE TABLE IF NOT EXISTS feedback (
 	queryDeleteLink = `DELETE FROM links WHERE short_url = $1`
 
 	queryUpdateExp = `UPDATE links SET expires_at = $1 WHERE short_url = $2 AND user_id = $3`
+
+	queryGetSuspect = `SELECT sl.short_url, l.original_url
+						FROM suspect_links sl
+						JOIN links l ON sl.id = l.id;`
+
+	queryAllUsers = `SELECT COUNT(*) FROM users`
+
+	queryAllLinks = `SELECT COUNT(*) FROM links`
+
+	queryAllClicks = `SELECT COUNT(*) FROM clicks`
+
+	queryAllExpired = `SELECT COUNT(*) FROM links WHERE expires_at < NOW()`
 )
 
 type DB struct {
@@ -305,6 +317,66 @@ func UpdateLinkExpiry(Database *DB, userID int64, shortURL string, newExpiry tim
 	}
 
 	return nil
+}
+
+func GetSuspectLinks(db *sql.DB) ([]Link, error) {
+	rows, err := db.Query(queryGetSuspect)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var links []Link
+
+	for rows.Next() {
+		var link Link
+		if err := rows.Scan(&link.ShortURL, &link.OriginalURL); err != nil {
+			return nil, err
+		}
+		links = append(links, link)
+	}
+
+	return links, nil
+}
+
+func GetSummaryStatistics(db *sql.DB) (struct {
+	Users        int
+	Links        int
+	Clicks       int
+	ExpiredLinks int
+}, error) {
+	var stats struct {
+		Users        int
+		Links        int
+		Clicks       int
+		ExpiredLinks int
+	}
+
+	err := db.QueryRow(queryAllUsers).Scan(&stats.Users)
+	if err != nil {
+		return stats, err
+	}
+
+	err = db.QueryRow(queryAllLinks).Scan(&stats.Links)
+	if err != nil {
+		return stats, err
+	}
+
+	err = db.QueryRow(queryAllClicks).Scan(&stats.Clicks)
+	if err != nil {
+		return stats, err
+	}
+
+	err = db.QueryRow(queryAllExpired).Scan(&stats.ExpiredLinks)
+	if err != nil {
+		return stats, err
+	}
+
+	return stats, nil
+}
+
+func DeleteSuspectLink(db *sql.DB, link string) error {
+	_, err := db.Exec(queryDeleteLink, link)
+	return err
 }
 
 func DropDatabase(dbName string, dbtype string, postgres string) error {
