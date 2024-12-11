@@ -5,6 +5,8 @@ import (
 	"2links/internal/pkg/shortener"
 	"fmt"
 	"log"
+	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -52,20 +54,25 @@ func StartBot(url string, db *saving.DB, token string) {
 					log.Printf("Error deleting link: %v", err)
 				}
 				message = "Ссылка удалена"
+				msg := tgbotapi.NewMessage(chatID, message)
+				msg.ReplyMarkup = keyboard
+				bot.Send(msg)
 
 			case callbackData == "back":
 				message = "Возвращаемся в основное меню"
+				msg := tgbotapi.NewMessage(chatID, message)
+				msg.ReplyMarkup = keyboard
+				bot.Send(msg)
 
 			case len(callbackData) > 7 && callbackData[:7] == "update:":
 				shortURL := callbackData[7:]
+
 				userStates.Store(chatID, fmt.Sprintf("awaiting_expiry_%s", shortURL))
 				message = fmt.Sprintf("Введите новый срок хранения для ссылки %s в формате DD-MM-YYYYY:", shortURL)
-
+				msg := tgbotapi.NewMessage(chatID, message)
+				msg.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
+				bot.Send(msg)
 			}
-
-			msg := tgbotapi.NewMessage(chatID, message)
-			msg.ReplyMarkup = keyboard
-			bot.Send(msg)
 
 		} else if update.PollAnswer != nil {
 			var msg tgbotapi.MessageConfig
@@ -237,14 +244,33 @@ func StartBot(url string, db *saving.DB, token string) {
 					userStates.Delete(chatID)
 
 				} else if ok && strings.HasPrefix(state.(string), "awaiting_expiry_") {
+					threashold := os.Getenv("MAX_LIFETIME")
+					if threashold == "" {
+						threashold = "730"
+					}
+
+					threasholdDays, err := strconv.Atoi(threashold)
+					if err != nil {
+						log.Printf("Error converting lifetime: %v", err)
+						break
+					}
+
 					shortURL := strings.TrimPrefix(state.(string), "awaiting_expiry_")
 					newExpiry, err := time.Parse("02-01-2006", update.Message.Text)
-					var message string
 					if err != nil {
 						msg := tgbotapi.NewMessage(chatID, "Неверный формат даты. Используйте формат: DD-MM-YYYY.")
 						bot.Send(msg)
 						break
 					}
+
+					differenceInDays := int(newExpiry.Sub(time.Now()).Hours() / 24)
+					if newExpiry.Before(time.Now()) || differenceInDays > threasholdDays {
+						msg := tgbotapi.NewMessage(chatID, fmt.Sprintf("Нельзя установить прошедшую дату, и срок жизни не может превышать %d дней. Введите заново", threasholdDays))
+						bot.Send(msg)
+						break
+					}
+
+					var message string
 
 					err = saving.UpdateLinkExpiry(db, chatID, shortURL, newExpiry)
 					if err != nil {
@@ -254,7 +280,8 @@ func StartBot(url string, db *saving.DB, token string) {
 					}
 
 					userStates.Delete(chatID)
-					bot.Send(tgbotapi.NewMessage(chatID, message))
+					msg = tgbotapi.NewMessage(chatID, message)
+					msg.ReplyMarkup = keyboard
 				} else if strings.HasPrefix(update.Message.Text, "/qr_") {
 					shortURL := strings.TrimPrefix(update.Message.Text, "/qr_")
 					qrFilePath, err := shortener.GenerateQRCode(url, shortURL)
