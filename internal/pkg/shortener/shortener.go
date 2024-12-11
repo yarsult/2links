@@ -4,6 +4,7 @@ import (
 	"2links/internal/pkg/saving"
 	"math/rand"
 	"net/url"
+	"regexp"
 	"time"
 )
 
@@ -24,10 +25,15 @@ func СreateShortLink(Db *saving.DB, id int64, longlink string) string {
 }
 
 func CheckValidacy(link string) bool {
-	_, err1 := url.Parse(link)
-	if err1 != nil {
-		return false
+	re := regexp.MustCompile(`^([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(:\d+)?(/[^\s]*)?$`)
+	if re.MatchString(link) {
+		return true
 	}
 
-	return true
+	parsedURL, err := url.Parse(link)
+	if err == nil && parsedURL.Host != "" {
+		return true
+	}
+
+	return false
 }

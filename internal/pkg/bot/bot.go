@@ -52,6 +52,7 @@ func StartBot(url string, db *saving.DB, token string) {
 					log.Printf("Error deleting link: %v", err)
 				}
 				message = "Ссылка удалена"
+
 			case callbackData == "back":
 				message = "Возвращаемся в основное меню"
 
@@ -65,6 +66,7 @@ func StartBot(url string, db *saving.DB, token string) {
 			msg := tgbotapi.NewMessage(chatID, message)
 			msg.ReplyMarkup = keyboard
 			bot.Send(msg)
+
 		} else if update.PollAnswer != nil {
 			var msg tgbotapi.MessageConfig
 			answer := update.PollAnswer
@@ -192,11 +194,12 @@ func StartBot(url string, db *saving.DB, token string) {
 					if shortener.CheckValidacy(longLink) {
 						shortenedLink := url + shortener.СreateShortLink(db, chatID, longLink)
 						msg = tgbotapi.NewMessage(chatID, "Вот ваша сокращённая ссылка: "+shortenedLink)
-						msg.ReplyMarkup = keyboard
-						userStates.Delete(chatID)
+
 					} else {
-						msg = tgbotapi.NewMessage(chatID, "Ваша ссылка не действительня, попробуй другую")
+						msg = tgbotapi.NewMessage(chatID, "Эта ссылка не действительня, попробуйте другую")
 					}
+					msg.ReplyMarkup = keyboard
+					userStates.Delete(chatID)
 
 				} else if ok && state == "awaiting_feedback_details" {
 					msg = tgbotapi.NewMessage(chatID, "Спасибо за ваш отзыв!")
@@ -218,7 +221,7 @@ func StartBot(url string, db *saving.DB, token string) {
 							message = "Ссылка не найдена"
 						} else {
 							err = saving.SuspectLink(db.Db, linkID, badLink)
-							message = "Спасибо за обращения, мы проверим эту ссылку"
+							message = "Спасибо за обращение, мы проверим эту ссылку"
 						}
 					} else {
 						message = "Неверный формат ссылки"
