@@ -57,6 +57,7 @@ func main() {
 	}
 
 	defer db.Db.Close()
+	// to drop db
 	// db.Db.Close()
 	// saving.DropDatabase("shortlinks", dbType, postgresDefault)
 
