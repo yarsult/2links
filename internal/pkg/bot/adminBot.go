@@ -28,6 +28,8 @@ func StartAdminBot(token string, db *saving.DB) {
 
 	keyboard := tgbotapi.NewReplyKeyboard(
 		tgbotapi.NewKeyboardButtonRow(tgbotapi.NewKeyboardButton("Подозрительные ссылки")),
+		tgbotapi.NewKeyboardButtonRow(tgbotapi.NewKeyboardButton("Последние отзывы")),
+		tgbotapi.NewKeyboardButtonRow(tgbotapi.NewKeyboardButton("Средняя оценка")),
 		tgbotapi.NewKeyboardButtonRow(tgbotapi.NewKeyboardButton("Сводная статистика")),
 	)
 
@@ -63,6 +65,10 @@ func StartAdminBot(token string, db *saving.DB) {
 				handleSuspectLinks(bot, db, chatID)
 			case text == "Сводная статистика":
 				handleStatistics(bot, db, chatID)
+			case text == "Последние отзывы":
+				handleReviews(bot, db, chatID)
+			case text == "Средняя оценка":
+				handleGrade(bot, db, chatID)
 			case strings.HasPrefix(text, "/delete_"):
 				link := strings.TrimPrefix(text, "/delete_")
 				handleDeleteLink(bot, db, chatID, link)
@@ -71,6 +77,37 @@ func StartAdminBot(token string, db *saving.DB) {
 			}
 		}
 	}
+}
+
+func handleReviews(bot *tgbotapi.BotAPI, db *saving.DB, chatID int64) {
+	reviews, err := saving.GetReviews(db.Db)
+	if err != nil {
+		bot.Send(tgbotapi.NewMessage(chatID, "Ошибка при получении списка отзывов"))
+		log.Printf("Error fetching reviews: %v", err)
+		return
+	}
+
+	if len(reviews) == 0 {
+		bot.Send(tgbotapi.NewMessage(chatID, "Нет отзывов."))
+		return
+	}
+
+	message := "Последние 5 отзывов:\n"
+	for i, r := range reviews {
+		message += fmt.Sprintf("%d. %s\n", i+1, r)
+	}
+
+	bot.Send(tgbotapi.NewMessage(chatID, message))
+}
+
+func handleGrade(bot *tgbotapi.BotAPI, db *saving.DB, chatID int64) {
+	grade, err := saving.GetGrade(db.Db)
+	if err != nil {
+		bot.Send(tgbotapi.NewMessage(chatID, "Ошибка при получении средней оценки."))
+		log.Printf("Error fetching grade: %v", err)
+		return
+	}
+	bot.Send(tgbotapi.NewMessage(chatID, fmt.Sprintf("Средняя оценка сервиса: %.3f", grade)))
 }
 
 func handleSuspectLinks(bot *tgbotapi.BotAPI, db *saving.DB, chatID int64) {

@@ -36,7 +36,7 @@ func StartBot(url string, db *saving.DB, token string) {
 	)
 
 	question := "Как вам наш сервис?"
-	options := []string{"Плохо", "Средне", "Хорошо", "Отлично"}
+	options := []string{"Плохо", "Так себе", "Хорошо", "Здорово", "Супер"}
 	isAnonymous := false
 
 	updates := bot.GetUpdatesChan(u)
@@ -78,12 +78,14 @@ func StartBot(url string, db *saving.DB, token string) {
 			var msg tgbotapi.MessageConfig
 			answer := update.PollAnswer
 			userChoiceIndex := answer.OptionIDs[0]
-			err = saving.SaveFeedback(db, userChoiceIndex+1, answer.User.ID)
+			err = saving.SaveFeedback(db, userChoiceIndex+2, answer.User.ID)
+			fmt.Println(userChoiceIndex)
 			if userChoiceIndex == 4 {
 				msg = tgbotapi.NewMessage(answer.User.ID, "Спасибо за вашу оценку!")
 			} else {
 				userStates.Store(answer.User.ID, "awaiting_feedback_details")
 				msg = tgbotapi.NewMessage(answer.User.ID, "Расскажите подробнее, что можно улучшить?")
+				msg.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
 			}
 
 			if _, err := bot.Send(msg); err != nil {
@@ -219,6 +221,7 @@ func StartBot(url string, db *saving.DB, token string) {
 					if err != nil {
 						log.Printf("Error saving review: %v", err)
 					}
+					msg.ReplyMarkup = keyboard
 					userStates.Delete(chatID)
 
 				} else if ok && state == "awaiting_bad_link" {
