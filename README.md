@@ -25,8 +25,8 @@
 
 **Clone the repository**
 
-```git clone https://github.com/yourusername/2links.git```
-```cd 2links```
+- ```git clone https://github.com/yourusername/2links.git```
+- ```cd 2links```
 
 **Configure Environment Variables**
 
@@ -57,8 +57,8 @@ MAX_LIFETIME=730
 ```docker-compose up --build```
 
 ## Access:
-•	Telegram Bot: Use /start to interact with the bot.
-•	Admin Bot: Start and authenticate with the admin bot to manage links and view statistics.
+- Telegram Bot: Use /start to interact with the bot.
+- Admin Bot: Start and authenticate with the admin bot to manage links and view statistics.
 
 ## Project Structure
 
@@ -80,7 +80,6 @@ MAX_LIFETIME=730
 
 #### User Commands
 
-Command	Description
 ```
 /start	Starts the bot.
 /help	Provides help and usage instructions.
@@ -92,10 +91,11 @@ Mои ссылки	View all active links with statistics and options.
 
 #### Admin Commands
 
-Command	Description
+```
 /start	Authenticate with a secure password to access.
 Проверить ссылки	View flagged suspicious links.
 Общая статистика	View statistics for all users and links.
+```
 
 ## Database Schema
 
