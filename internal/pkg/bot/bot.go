@@ -77,7 +77,7 @@ func StartBot(url string, db *saving.DB, token string) {
 			case len(callbackData) > 7 && callbackData[:7] == "update:":
 				shortURL := callbackData[7:]
 				userStates.Store(chatID, fmt.Sprintf("awaiting_expiry_%s", shortURL))
-				message = fmt.Sprintf("Введите новый срок хранения для ссылки %s в формате DD-MM-YYYYY:", shortURL)
+				message = fmt.Sprintf("Введите новый срок хранения для ссылки %s в формате DD-MM-YYYY:", shortURL)
 				msg := tgbotapi.NewMessage(chatID, message)
 				msg.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
 				bot.Send(msg)
