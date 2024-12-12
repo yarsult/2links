@@ -80,7 +80,9 @@ CREATE TABLE IF NOT EXISTS feedback (
 
 	queryAddSuspect = `INSERT INTO suspect_links (id, short_url) VALUES ($1, $2);`
 
-	queryAddFeedback = `INSERT INTO feedback (user_id, grade) VALUES ($1, $2);`
+	queryAddFeedback = `DELETE FROM feedback 
+						WHERE user_id = $1;
+						INSERT INTO feedback (user_id, grade) VALUES ($1, $2);`
 
 	queryAddReview = `INSERT INTO reviews (user_id, review) VALUES ($1, $2);`
 
@@ -112,6 +114,10 @@ CREATE TABLE IF NOT EXISTS feedback (
 	queryAllClicks = `SELECT COUNT(*) FROM clicks`
 
 	queryAllExpired = `SELECT COUNT(*) FROM links WHERE expires_at < NOW()`
+
+	queryGetReviews = `SELECT review FROM reviews ORDER BY id DESC LIMIT 5`
+
+	queryGetGrade = `SELECT AVG(grade) FROM feedback`
 )
 
 type DB struct {
@@ -305,7 +311,6 @@ func GetOriginalURL(db *sql.DB, shortLink string) (string, int, time.Time, error
 }
 
 func UpdateLinkExpiry(Database *DB, userID int64, shortURL string, newExpiry time.Time) error {
-
 	result, err := Database.Db.Exec(queryUpdateExp, newExpiry, shortURL, userID)
 	if err != nil {
 		return fmt.Errorf("Error updating link expiry: %w", err)
@@ -317,6 +322,38 @@ func UpdateLinkExpiry(Database *DB, userID int64, shortURL string, newExpiry tim
 	}
 
 	return nil
+}
+func GetReviews(db *sql.DB) ([]string, error) {
+	rows, err := db.Query(queryGetReviews)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to fetch user links: %v", err)
+	}
+	defer rows.Close()
+
+	var reviews []string
+	for rows.Next() {
+		var r string
+		if err := rows.Scan(&r); err != nil {
+			return nil, fmt.Errorf("Failed to scan row: %v", err)
+		}
+		reviews = append(reviews, r)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("Row iteration error: %v", err)
+	}
+
+	return reviews, nil
+}
+
+func GetGrade(db *sql.DB) (float32, error) {
+	var grade float32
+	err := db.QueryRow(queryGetGrade).Scan(&grade)
+	if err != nil {
+		log.Println("Error counting grade:", err)
+		return 0, err
+	}
+	return grade, nil
 }
 
 func GetSuspectLinks(db *sql.DB) ([]Link, error) {
