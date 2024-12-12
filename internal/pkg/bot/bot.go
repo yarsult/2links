@@ -87,7 +87,7 @@ func StartBot(url string, db *saving.DB, token string) {
 			var msg tgbotapi.MessageConfig
 			answer := update.PollAnswer
 			userChoiceIndex := answer.OptionIDs[0]
-			err = saving.SaveFeedback(db, userChoiceIndex+2, answer.User.ID)
+			err = saving.SaveFeedback(db.Db, userChoiceIndex+2, answer.User.ID)
 			fmt.Println(userChoiceIndex)
 			if userChoiceIndex == 4 {
 				msg = tgbotapi.NewMessage(answer.User.ID, "Спасибо за вашу оценку!")
@@ -108,8 +108,8 @@ func StartBot(url string, db *saving.DB, token string) {
 			switch update.Message.Text {
 
 			case "/start":
-				if !saving.UserInBase(db, chatID) {
-					err = saving.AddUser(db, chatID)
+				if !saving.UserInBase(db.Db, chatID) {
+					err = saving.AddUser(db.Db, chatID)
 					if err != nil {
 						log.Printf("Error saving user %v", err)
 					}
@@ -142,7 +142,7 @@ func StartBot(url string, db *saving.DB, token string) {
 					return
 				}
 
-				links, err := saving.ShowMyLinks(db, chatID)
+				links, err := saving.ShowMyLinks(db.Db, chatID)
 				if err != nil {
 					log.Printf("Error fetching links: %v", err)
 					bot.Send(tgbotapi.NewMessage(chatID, "Ошибка при получении ваших ссылок. Попробуйте позже."))
@@ -233,7 +233,7 @@ func StartBot(url string, db *saving.DB, token string) {
 
 				} else if ok && state == "awaiting_feedback_details" {
 					msg = tgbotapi.NewMessage(chatID, "Спасибо за ваш отзыв!")
-					err = saving.SaveReview(db, update.Message.Text, chatID)
+					err = saving.SaveReview(db.Db, update.Message.Text, chatID)
 					if err != nil {
 						log.Printf("Error saving review: %v", err)
 					}
@@ -292,7 +292,7 @@ func StartBot(url string, db *saving.DB, token string) {
 
 					var message string
 
-					err = saving.UpdateLinkExpiry(db, chatID, shortURL, newExpiry)
+					err = saving.UpdateLinkExpiry(db.Db, chatID, shortURL, newExpiry)
 					if err != nil {
 						message = "Не удалось обновить срок хранения. Убедитесь, что ссылка существует."
 					} else {

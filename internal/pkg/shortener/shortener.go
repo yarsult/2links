@@ -22,10 +22,10 @@ func СreateShortLink(Db *saving.DB, id int64, longlink string) (string, error) 
 		for range 4 {
 			newlink += string(symbols[rand.Intn(len(symbols))])
 		}
-		res = saving.LinkInBase(Db, newlink)
+		res = saving.LinkInBase(Db.Db, newlink)
 	}
 
-	saving.SaveLink(Db, id, longlink, newlink, time.Now().Add((24 * time.Hour * 30)))
+	saving.SaveLink(Db.Db, id, longlink, newlink, time.Now().Add((24 * time.Hour * 30)))
 	return newlink, nil
 }
 
