@@ -141,58 +141,64 @@ func CreateDB(dbtype string, conn string) (*DB, error) {
 	if err != nil {
 		log.Fatal("Error creating tables", err)
 	}
+
 	return &DB{Db: db}, nil
 }
 
-func SaveLink(Database *DB, id int64, orig string, short string, exp time.Time) error {
-	_, err := Database.Db.Exec(queryAddLink, id, orig, short, exp)
+func SaveLink(db *sql.DB, id int64, orig string, short string, exp time.Time) error {
+	_, err := db.Exec(queryAddLink, id, orig, short, exp)
 	if err != nil {
 		log.Println("Error saving link:", err)
 		return err
 	}
+
 	return nil
 }
 
-func UserInBase(Database *DB, id int64) bool {
+func UserInBase(db *sql.DB, id int64) bool {
 	var exists bool
-	err := Database.Db.QueryRow(queryCheckUser, id).Scan(&exists)
+	err := db.QueryRow(queryCheckUser, id).Scan(&exists)
 	if err != nil {
 		log.Println("Error finding user:", err)
 		return false
 	}
+
 	return exists
 }
 
-func LinkInBase(Database *DB, link string) bool {
+func LinkInBase(db *sql.DB, link string) bool {
 	var exists bool
-	err := Database.Db.QueryRow(queryUniqueLink, link).Scan(&exists)
+	err := db.QueryRow(queryUniqueLink, link).Scan(&exists)
 	if err != nil {
 		log.Println("Error finding link:", err)
 		return false
 	}
+
 	return exists
 }
 
-func AddUser(Database *DB, id int64) error {
-	_, err := Database.Db.Exec(queryAddUser, id)
+func AddUser(db *sql.DB, id int64) error {
+	_, err := db.Exec(queryAddUser, id)
 	if err != nil {
 		log.Println("Error saving user:", err)
 		return err
 	}
+
 	return nil
 }
 
-func SaveFeedback(Database *DB, ans int, id int64) error {
-	_, err := Database.Db.Exec(queryAddFeedback, id, ans)
+func SaveFeedback(db *sql.DB, ans int, id int64) error {
+	_, err := db.Exec(queryAddFeedback, id, ans)
 	if err != nil {
 		log.Println("Error saving feedback:", err)
 		return err
 	}
+
 	return nil
 }
 
-func SaveReview(Database *DB, ans string, id int64) error {
-	_, err := Database.Db.Exec(queryAddReview, id, ans)
+func SaveReview(db *sql.DB, ans string, id int64) error {
+	_, err := db.Exec(queryAddReview, id, ans)
 	if err != nil {
 		log.Println("Error saving review:", err)
 		return err
@@ -208,6 +214,7 @@ func FindLink(db *sql.DB, link string) (int, error) {
 	} else if err != nil {
 		return 0, fmt.Errorf("Database query error: %w", err)
 	}
+
 	return linkID, nil
 }
 
@@ -217,14 +224,16 @@ func SuspectLink(db *sql.DB, id int, link string) error {
 		log.Println("Error saving review:", err)
 		return err
 	}
+
 	return nil
 }
 
-func ShowMyLinks(Database *DB, id int64) ([]Link, error) {
-	rows, err := Database.Db.Query(queryShowLink, id)
+func ShowMyLinks(db *sql.DB, id int64) ([]Link, error) {
+	rows, err := db.Query(queryShowLink, id)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to fetch user links: %v", err)
 	}
+
 	defer rows.Close()
 
 	var links []Link
@@ -262,6 +271,7 @@ func SaveClick(db *sql.DB, linkID int, ipAddress, userAgent string) error {
 	if err != nil {
 		return fmt.Errorf("Failed to save click: %w", err)
 	}
+
 	return nil
 }
 
@@ -273,6 +283,7 @@ func GetClicksByUser(db *sql.DB, userID int64) (map[string]struct {
 	if err != nil {
 		return nil, fmt.Errorf("Failed to fetch clicks: %w", err)
 	}
+
 	defer rows.Close()
 
 	clicks := make(map[string]struct {
@@ -307,11 +318,12 @@ func GetOriginalURL(db *sql.DB, shortLink string) (string, int, time.Time, error
 	} else if err != nil {
 		return "", 0, expires_at, fmt.Errorf("Database query error: %w", err)
 	}
+
 	return originalURL, linkID, expires_at, nil
 }
 
-func UpdateLinkExpiry(Database *DB, userID int64, shortURL string, newExpiry time.Time) error {
-	result, err := Database.Db.Exec(queryUpdateExp, newExpiry, shortURL, userID)
+func UpdateLinkExpiry(db *sql.DB, userID int64, shortURL string, newExpiry time.Time) error {
+	result, err := db.Exec(queryUpdateExp, newExpiry, shortURL, userID)
 	if err != nil {
 		return fmt.Errorf("Error updating link expiry: %w", err)
 	}
@@ -323,11 +335,13 @@ func UpdateLinkExpiry(Database *DB, userID int64, shortURL string, newExpiry tim
 
 	return nil
 }
+
 func GetReviews(db *sql.DB) ([]string, error) {
 	rows, err := db.Query(queryGetReviews)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to fetch user links: %v", err)
 	}
+
 	defer rows.Close()
 
 	var reviews []string
@@ -353,6 +367,7 @@ func GetGrade(db *sql.DB) (float32, error) {
 		log.Println("Error counting grade:", err)
 		return 0, err
 	}
+
 	return grade, nil
 }
 
@@ -361,6 +376,7 @@ func GetSuspectLinks(db *sql.DB) ([]Link, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	defer rows.Close()
 	var links []Link
 
@@ -421,8 +437,8 @@ func DropDatabase(dbName string, dbtype string, postgres string) error {
 	if err != nil {
 		return fmt.Errorf("Failed to connect to postgres: %v", err)
 	}
-	defer db.Close()
 
+	defer db.Close()
 	query := fmt.Sprintf("DROP DATABASE IF EXISTS %s;", dbName)
 	_, err = db.Exec(query)
 	if err != nil {

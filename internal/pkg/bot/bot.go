@@ -14,6 +14,14 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
+const (
+	buttonShorten   = "Сократить ссылку"
+	buttonMyLinks   = "Мои ссылки"
+	buttonComplaint = "Пожаловаться на ссылку"
+	buttonFeedback  = "Оставить обратную связь"
+	buttonHelp      = "Получить помощь"
+)
+
 var userStates sync.Map
 
 func StartBot(url string, db *saving.DB, token string) {
@@ -21,6 +29,7 @@ func StartBot(url string, db *saving.DB, token string) {
 	if err != nil {
 		log.Panic(err)
 	}
+
 	bot.Debug = true
 	log.Printf("Authorized on account %s", bot.Self.UserName)
 
@@ -28,11 +37,11 @@ func StartBot(url string, db *saving.DB, token string) {
 	u.Timeout = 60
 
 	keyboard := tgbotapi.NewReplyKeyboard(
-		tgbotapi.NewKeyboardButtonRow(tgbotapi.NewKeyboardButton("Сократить ссылку")),
-		tgbotapi.NewKeyboardButtonRow(tgbotapi.NewKeyboardButton("Мои ссылки")),
-		tgbotapi.NewKeyboardButtonRow(tgbotapi.NewKeyboardButton("Пожаловаться на ссылку")),
-		tgbotapi.NewKeyboardButtonRow(tgbotapi.NewKeyboardButton("Оставить обратную связь")),
-		tgbotapi.NewKeyboardButtonRow(tgbotapi.NewKeyboardButton("Получить помощь")),
+		tgbotapi.NewKeyboardButtonRow(tgbotapi.NewKeyboardButton(buttonShorten)),
+		tgbotapi.NewKeyboardButtonRow(tgbotapi.NewKeyboardButton(buttonMyLinks)),
+		tgbotapi.NewKeyboardButtonRow(tgbotapi.NewKeyboardButton(buttonComplaint)),
+		tgbotapi.NewKeyboardButtonRow(tgbotapi.NewKeyboardButton(buttonFeedback)),
+		tgbotapi.NewKeyboardButtonRow(tgbotapi.NewKeyboardButton(buttonHelp)),
 	)
 
 	question := "Как вам наш сервис?"
@@ -53,6 +62,7 @@ func StartBot(url string, db *saving.DB, token string) {
 				if err != nil {
 					log.Printf("Error deleting link: %v", err)
 				}
+
 				message = "Ссылка удалена"
 				msg := tgbotapi.NewMessage(chatID, message)
 				msg.ReplyMarkup = keyboard
@@ -66,7 +76,6 @@ func StartBot(url string, db *saving.DB, token string) {
 
 			case len(callbackData) > 7 && callbackData[:7] == "update:":
 				shortURL := callbackData[7:]
-
 				userStates.Store(chatID, fmt.Sprintf("awaiting_expiry_%s", shortURL))
 				message = fmt.Sprintf("Введите новый срок хранения для ссылки %s в формате DD-MM-YYYYY:", shortURL)
 				msg := tgbotapi.NewMessage(chatID, message)
@@ -78,7 +87,7 @@ func StartBot(url string, db *saving.DB, token string) {
 			var msg tgbotapi.MessageConfig
 			answer := update.PollAnswer
 			userChoiceIndex := answer.OptionIDs[0]
-			err = saving.SaveFeedback(db, userChoiceIndex+2, answer.User.ID)
+			err = saving.SaveFeedback(db.Db, userChoiceIndex+2, answer.User.ID)
 			fmt.Println(userChoiceIndex)
 			if userChoiceIndex == 4 {
 				msg = tgbotapi.NewMessage(answer.User.ID, "Спасибо за вашу оценку!")
@@ -91,6 +100,7 @@ func StartBot(url string, db *saving.DB, token string) {
 			if _, err := bot.Send(msg); err != nil {
 				log.Printf("Error sending message: %v", err)
 			}
+
 		} else if update.Message != nil {
 			var msg tgbotapi.MessageConfig
 			chatID := update.Message.Chat.ID
@@ -98,20 +108,20 @@ func StartBot(url string, db *saving.DB, token string) {
 			switch update.Message.Text {
 
 			case "/start":
-
-				if !saving.UserInBase(db, chatID) {
-					err = saving.AddUser(db, chatID)
+				if !saving.UserInBase(db.Db, chatID) {
+					err = saving.AddUser(db.Db, chatID)
 					if err != nil {
 						log.Printf("Error saving user %v", err)
 					}
 				}
+
 				msg = tgbotapi.NewMessage(chatID, "Привет! Я бот для сокращения ссылок 2links")
 				msg.ReplyMarkup = keyboard
 
-			case "/help", "Получить помощь":
+			case "/help", buttonHelp:
 				msg = tgbotapi.NewMessage(chatID, "Я могу помочь с сокращением ссылок:\n/start - Запустить\n/feedback - Поделиться мнением о боте\n/help - Узнать, что я умею")
 
-			case "/feedback", "Оставить обратную связь":
+			case "/feedback", buttonFeedback:
 				poll := tgbotapi.SendPollConfig{
 					BaseChat:    tgbotapi.BaseChat{ChatID: chatID},
 					Question:    question,
@@ -124,7 +134,7 @@ func StartBot(url string, db *saving.DB, token string) {
 					log.Printf("Failed to send poll: %v", err)
 				}
 
-			case "Мои ссылки":
+			case buttonMyLinks:
 				stats, err := saving.GetClicksByUser(db.Db, chatID)
 				if err != nil {
 					log.Printf("Error fetching clicks: %v", err)
@@ -132,7 +142,7 @@ func StartBot(url string, db *saving.DB, token string) {
 					return
 				}
 
-				links, err := saving.ShowMyLinks(db, chatID)
+				links, err := saving.ShowMyLinks(db.Db, chatID)
 				if err != nil {
 					log.Printf("Error fetching links: %v", err)
 					bot.Send(tgbotapi.NewMessage(chatID, "Ошибка при получении ваших ссылок. Попробуйте позже."))
@@ -163,7 +173,6 @@ func StartBot(url string, db *saving.DB, token string) {
 							url+link.ShortURL, link.OriginalURL, clicks, formattedTime,
 						)
 					} else {
-
 						message += fmt.Sprintf(
 							"Ссылка: [%s](%s)\nОригинал: %s\nПереходов: %d\nСоздана: %s\nИстекает: %s\nОсталось: %d дней\nQR-код: [/qr_%s](%s)\n\n",
 							url+link.ShortURL, url+link.ShortURL, link.OriginalURL, clicks, formattedTime, expiryTime, daysLeft, link.ShortURL, fmt.Sprintf("/qr/%s", link.ShortURL),
@@ -192,12 +201,12 @@ func StartBot(url string, db *saving.DB, token string) {
 				msg.ParseMode = "Markdown"
 				bot.Send(msg)
 
-			case "Сократить ссылку":
+			case buttonShorten:
 				msg = tgbotapi.NewMessage(chatID, "Введите ссылку - и я сокращу её")
 				msg.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
 				userStates.Store(chatID, "awaiting_link")
 
-			case "Пожаловаться на ссылку":
+			case buttonComplaint:
 				msg = tgbotapi.NewMessage(chatID, "Введите ссылку, на которую хотите пожаловаться в формате 2lnx.ru/xxxx")
 				msg.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
 				userStates.Store(chatID, "awaiting_bad_link")
@@ -206,21 +215,29 @@ func StartBot(url string, db *saving.DB, token string) {
 				if ok && state == "awaiting_link" {
 					longLink := update.Message.Text
 					if shortener.CheckValidacy(longLink) {
-						shortenedLink := url + shortener.СreateShortLink(db, chatID, longLink)
-						msg = tgbotapi.NewMessage(chatID, "Вот ваша сокращённая ссылка: "+shortenedLink)
+						shortLink, err := shortener.СreateShortLink(db, chatID, longLink)
+						if err != nil {
+							bot.Send(tgbotapi.NewMessage(chatID, "Ошибка при создании короткой ссылки. Попробуйте позже."))
+							log.Printf("Error creating short link: %v", err)
+							continue
+						}
+
+						msg = tgbotapi.NewMessage(chatID, "Вот ваша сокращённая ссылка: "+url+shortLink)
 
 					} else {
 						msg = tgbotapi.NewMessage(chatID, "Эта ссылка не действительня, попробуйте другую")
 					}
+
 					msg.ReplyMarkup = keyboard
 					userStates.Delete(chatID)
 
 				} else if ok && state == "awaiting_feedback_details" {
 					msg = tgbotapi.NewMessage(chatID, "Спасибо за ваш отзыв!")
-					err = saving.SaveReview(db, update.Message.Text, chatID)
+					err = saving.SaveReview(db.Db, update.Message.Text, chatID)
 					if err != nil {
 						log.Printf("Error saving review: %v", err)
 					}
+
 					msg.ReplyMarkup = keyboard
 					userStates.Delete(chatID)
 
@@ -275,7 +292,7 @@ func StartBot(url string, db *saving.DB, token string) {
 
 					var message string
 
-					err = saving.UpdateLinkExpiry(db, chatID, shortURL, newExpiry)
+					err = saving.UpdateLinkExpiry(db.Db, chatID, shortURL, newExpiry)
 					if err != nil {
 						message = "Не удалось обновить срок хранения. Убедитесь, что ссылка существует."
 					} else {
@@ -304,9 +321,6 @@ func StartBot(url string, db *saving.DB, token string) {
 					msg = tgbotapi.NewMessage(chatID, "Такого не знаю(")
 				}
 			}
-			// if state == nil {
-			// 	msg.ReplyMarkup = keyboard
-			// }
 
 			if _, err := bot.Send(msg); err != nil {
 				log.Printf("Error sending message: %v", err)
