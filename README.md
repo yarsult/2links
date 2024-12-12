@@ -27,6 +27,7 @@
 - ```git clone https://github.com/yourusername/2links.git```
 - ```cd 2links```
 
+
 **Configure Environment Variables**
 
 Create a .env file in the cmd/ directory with the following variables:
@@ -49,6 +50,7 @@ PORT=8080
 # Links Settings
 MAX_LIFETIME=730
 ```
+
 
 **Run with Docker Compose**
 	1.	Build and Start:
@@ -90,6 +92,7 @@ Mои ссылки	View all active links with statistics and options.
 Пожаловаться на ссылку	Report a suspicious or harmful link.
 ```
 
+
 #### Admin Commands
 
 ```
@@ -106,6 +109,7 @@ Mои ссылки	View all active links with statistics and options.
 	3.	clicks: Tracks click statistics.
 	4.	suspect_links: Stores flagged suspicious links.
 	5.	feedback: Collects user feedback.
+
 
 #### API Integrations
 	1.	Telegram Bot API: User interaction and link management.
