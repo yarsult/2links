@@ -15,7 +15,7 @@ import (
 
 const symbols = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
-func СreateShortLink(Db *saving.DB, id int64, longlink string) string {
+func СreateShortLink(Db *saving.DB, id int64, longlink string) (string, error) {
 	var newlink string
 	res := true
 	for res != false {
@@ -26,7 +26,7 @@ func СreateShortLink(Db *saving.DB, id int64, longlink string) string {
 	}
 
 	saving.SaveLink(Db, id, longlink, newlink, time.Now().Add((24 * time.Hour * 30)))
-	return newlink
+	return newlink, nil
 }
 
 func CheckValidacy(link string) bool {
@@ -51,11 +51,13 @@ func GenerateQRCode(url string, short string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to generate QR code: %w", err)
 	}
+
 	content, err := os.ReadFile(filePath)
 	if err != nil {
 		fmt.Printf("Error reading file: %v\n", err)
 	} else {
 		fmt.Printf("File content size: %d bytes\n", len(content))
 	}
+
 	return filePath, nil
 }

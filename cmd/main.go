@@ -12,7 +12,6 @@ import (
 )
 
 func main() {
-
 	err := godotenv.Load()
 	if err != nil {
 		log.Printf("ENVs were loaded not straightly")
@@ -46,6 +45,7 @@ func main() {
 	if dbType == "" || postgresDefault == "" || postgresConn == "" {
 		log.Panic("Envs weren't loaded")
 	}
+
 	err = saving.CreateDatabaseIfNotExists("shortlinks", dbType, postgresDefault)
 	if err != nil {
 		log.Panic(err)
@@ -84,5 +84,4 @@ func main() {
 	}()
 
 	wg.Wait()
-
 }

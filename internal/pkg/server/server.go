@@ -46,6 +46,7 @@ func (s *Server) handleRedirect(w http.ResponseWriter, r *http.Request, db *sql.
 	if colonIndex := strings.LastIndex(ipAddress, ":"); colonIndex != -1 {
 		ipAddress = ipAddress[:colonIndex]
 	}
+
 	userAgent := r.Header.Get("User-Agent")
 	err = saving.SaveClick(db, linkID, ipAddress, userAgent)
 	if err != nil {

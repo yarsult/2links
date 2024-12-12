@@ -12,6 +12,13 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+const (
+	buttonSuspiciousLinks = "Подозрительные ссылки"
+	buttonLastReviews     = "Последние отзывы"
+	buttonMiddleGrade     = "Средняя оценка"
+	buttonStatistics      = "Сводная статистика"
+)
+
 var adminAuthorized sync.Map
 
 func StartAdminBot(token string, db *saving.DB) {
@@ -19,6 +26,7 @@ func StartAdminBot(token string, db *saving.DB) {
 	if err != nil {
 		log.Panic(err)
 	}
+
 	bot.Debug = true
 	log.Printf("Admin bot authorized on account %s", bot.Self.UserName)
 
@@ -27,10 +35,10 @@ func StartAdminBot(token string, db *saving.DB) {
 	updates := bot.GetUpdatesChan(u)
 
 	keyboard := tgbotapi.NewReplyKeyboard(
-		tgbotapi.NewKeyboardButtonRow(tgbotapi.NewKeyboardButton("Подозрительные ссылки")),
-		tgbotapi.NewKeyboardButtonRow(tgbotapi.NewKeyboardButton("Последние отзывы")),
-		tgbotapi.NewKeyboardButtonRow(tgbotapi.NewKeyboardButton("Средняя оценка")),
-		tgbotapi.NewKeyboardButtonRow(tgbotapi.NewKeyboardButton("Сводная статистика")),
+		tgbotapi.NewKeyboardButtonRow(tgbotapi.NewKeyboardButton(buttonSuspiciousLinks)),
+		tgbotapi.NewKeyboardButtonRow(tgbotapi.NewKeyboardButton(buttonLastReviews)),
+		tgbotapi.NewKeyboardButtonRow(tgbotapi.NewKeyboardButton(buttonMiddleGrade)),
+		tgbotapi.NewKeyboardButtonRow(tgbotapi.NewKeyboardButton(buttonStatistics)),
 	)
 
 	for update := range updates {
@@ -41,6 +49,7 @@ func StartAdminBot(token string, db *saving.DB) {
 			if err != nil {
 				log.Printf("Error reading file with hash: %v", err)
 			}
+
 			isAuthorized, _ := adminAuthorized.Load(chatID)
 			if authorized, ok := isAuthorized.(bool); !ok || !authorized {
 				if text == "/start" || text == "/help" {
@@ -57,21 +66,27 @@ func StartAdminBot(token string, db *saving.DB) {
 				} else {
 					bot.Send(tgbotapi.NewMessage(chatID, "Неверный пароль. Попробуйте снова."))
 				}
+
 				continue
 			}
 
 			switch {
-			case text == "Подозрительные ссылки":
+			case text == buttonSuspiciousLinks:
 				handleSuspectLinks(bot, db, chatID)
-			case text == "Сводная статистика":
+
+			case text == buttonStatistics:
 				handleStatistics(bot, db, chatID)
-			case text == "Последние отзывы":
+
+			case text == buttonLastReviews:
 				handleReviews(bot, db, chatID)
-			case text == "Средняя оценка":
+
+			case text == buttonMiddleGrade:
 				handleGrade(bot, db, chatID)
+
 			case strings.HasPrefix(text, "/delete_"):
 				link := strings.TrimPrefix(text, "/delete_")
 				handleDeleteLink(bot, db, chatID, link)
+
 			default:
 				bot.Send(tgbotapi.NewMessage(chatID, "Нет такой команды"))
 			}
@@ -107,6 +122,7 @@ func handleGrade(bot *tgbotapi.BotAPI, db *saving.DB, chatID int64) {
 		log.Printf("Error fetching grade: %v", err)
 		return
 	}
+
 	bot.Send(tgbotapi.NewMessage(chatID, fmt.Sprintf("Средняя оценка сервиса: %.3f", grade)))
 }
 
@@ -163,14 +179,14 @@ func handleStatistics(bot *tgbotapi.BotAPI, db *saving.DB, chatID int64) {
 
 func checkPasswordHash(password, hash string) bool {
 	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
-	fmt.Println(password, hash)
 	return err == nil
 }
 
 func readHashFromFile(filePath string) (string, error) {
 	data, err := os.ReadFile(filePath)
 	if err != nil {
-		return "", fmt.Errorf("failed to read file: %v", err)
+		return "", fmt.Errorf("Failed to read file: %v", err)
 	}
+
 	return strings.TrimSpace(string(data)), nil
 }
