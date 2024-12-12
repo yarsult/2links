@@ -61,19 +61,21 @@ MAX_LIFETIME=730
 
 ## Project Structure
 
+```plaintext
 2links/
-- ├── cmd/
-- │   ├── main.go                # Main entry point
-- │   └── .env                   # Environment variables
-- ├── internal/
-- │   ├── pkg/
-- │   │   ├── bot/               # Telegram bot functionality
-- │   │   ├── saving/            # Database interactions
-- │   │   ├── shortener/         # URL shortening and validation
-- │   │   └── server/            # HTTP server for link redirection
-- ├── docker-compose.yml         # Docker Compose configuration
-- ├── Dockerfile                 # Dockerfile for application
-- └── README.md                  # Project documentation
+├── cmd/
+│   ├── main.go              # Main entry point
+│   └── .env                 # Environment variables
+├── internal/
+│   ├── pkg/
+│   │   ├── bot/             # Telegram bot functionality
+│   │   ├── saving/          # Database interactions
+│   │   ├── shortener/       # URL shortening and validation
+│   │   └── server/          # HTTP server for link redirection
+├── docker-compose.yml       # Docker Compose configuration
+├── Dockerfile               # Dockerfile for application
+└── README.md                # Project documentationntation
+```
 
 ## Usage
 
