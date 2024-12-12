@@ -3,10 +3,10 @@
 ### A feature-rich URL shortening bot with added functionalities for generating QR codes, managing link expirations, and monitoring click statistics.
 
 **Features**
-	•	**URL Shortening**: Users can shorten URLs directly through the bot.
-	•	**QR Code Generation**: Automatically generate QR codes for shortened links.
-	•	**Link Expiration**: Links can expire after a set time (default 30 days).
-	•	**Click Statistics**: Monitor the number of clicks per link.
+	•	**URL Shortening**: Users can shorten URLs directly through the bot.\n
+	•	**QR Code Generation**: Automatically generate QR codes for shortened links.\n
+	•	**Link Expiration**: Links can expire after a set time (default 30 days).\n
+	•	**Click Statistics**: Monitor the number of clicks per link.\n
 	•	**Admin Dashboard**: Allows administrators to view suspicious links and overall statistics.
 
 ## Requirements
