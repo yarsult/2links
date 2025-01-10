@@ -139,19 +139,16 @@ func StartBot(url string, db *saving.DB, token string) {
 				if err != nil {
 					log.Printf("Error fetching clicks: %v", err)
 					bot.Send(tgbotapi.NewMessage(chatID, "Ошибка при получении статистики. Попробуйте позже."))
-					return
 				}
 
 				links, err := saving.ShowMyLinks(db.Db, chatID)
 				if err != nil {
 					log.Printf("Error fetching links: %v", err)
 					bot.Send(tgbotapi.NewMessage(chatID, "Ошибка при получении ваших ссылок. Попробуйте позже."))
-					return
 				}
 
 				if len(links) == 0 {
 					bot.Send(tgbotapi.NewMessage(chatID, "У вас пока нет ссылок."))
-					return
 				}
 
 				message := "Ваши ссылки:\n"
